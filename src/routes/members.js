@@ -71,6 +71,27 @@ router.patch('/:artist_id/:member_id', auth, requireManager, async (req, res) =>
   res.json({ member: rows[0] });
 });
 
+// PATCH /members/:artist_id/manager/:member_id — trasferisci ruolo manager
+router.patch('/:artist_id/manager/:member_id', auth, requireManager, async (req, res) => {
+  const client = await db.connect();
+  try {
+    await client.query('BEGIN');
+    // Rimuovi manager da tutti
+    await client.query('UPDATE band_members SET is_manager = false WHERE artist_id = $1', [req.params.artist_id]);
+    // Imposta nuovo manager
+    const { rows } = await client.query(
+      'UPDATE band_members SET is_manager = true WHERE id = $1 AND artist_id = $2 RETURNING *',
+      [req.params.member_id, req.params.artist_id]
+    );
+    if (!rows[0]) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Membro non trovato' }); }
+    await client.query('COMMIT');
+    res.json({ member: rows[0] });
+  } catch (e) {
+    await client.query('ROLLBACK');
+    res.status(500).json({ error: 'Errore server' });
+  } finally { client.release(); }
+});
+
 // DELETE /members/:artist_id/:member_id — rimuovi membro
 router.delete('/:artist_id/:member_id', auth, requireManager, async (req, res) => {
   const { rows } = await db.query(
