@@ -87,7 +87,8 @@ router.get('/', optionalAuth, async (req, res) => {
 router.get('/me/profiles', auth, async (req, res) => {
   const { rows } = await db.query(
     `SELECT ap.*,
-            (SELECT COUNT(*) FROM band_members bm WHERE bm.artist_id = ap.id) AS member_count
+            (SELECT COUNT(*) FROM band_members bm WHERE bm.artist_id = ap.id) AS member_count,
+            (SELECT COUNT(*) FROM favorites f WHERE f.artist_id = ap.id) AS favorites_count
      FROM artist_profiles ap
      WHERE ap.user_id = $1
      ORDER BY ap.created_at ASC`,
@@ -100,6 +101,16 @@ router.get('/me/profiles', auth, async (req, res) => {
 router.post('/me/profiles', auth, async (req, res) => {
   if (req.user.role !== 'artist')
     return res.status(403).json({ error: 'Solo gli artisti possono creare un profilo band' });
+
+  // Limite: gli artisti free possono avere una sola band
+  if (req.user.plan !== 'pro') {
+    const { rows: existing } = await db.query(
+      'SELECT id FROM artist_profiles WHERE user_id = $1',
+      [req.user.id]
+    );
+    if (existing.length >= 1)
+      return res.status(403).json({ error: 'Piano Free: puoi gestire una sola band. Passa a Pro per aggiungerne altre.', code: 'LIMIT_REACHED' });
+  }
 
   const { name, bio, city, cachet_min, set_duration_min, set_duration_max,
           genres, band_type, spotify_url, youtube_url, avatar_url, phone } = req.body;
