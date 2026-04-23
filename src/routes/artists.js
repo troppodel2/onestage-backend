@@ -87,7 +87,17 @@ router.post('/me/profile', auth, async (req, res) => {
       [req.user.id, name, bio, city, cachet_min, set_duration_min, set_duration_max,
        genres ?? [], band_type, spotify_url, youtube_url, photo_url, phone]
     );
-    res.status(201).json({ profile: rows[0] });
+    const profile = rows[0];
+
+    // Auto-aggiunge il creator come manager della band
+    const userRow = await db.query('SELECT username, email FROM users WHERE id = $1', [req.user.id]);
+    await db.query(
+      `INSERT INTO band_members (artist_id, user_id, name, roles, email, is_manager)
+       VALUES ($1, $2, $3, $4, $5, true)`,
+      [profile.id, req.user.id, userRow.rows[0].username, ['Manager'], userRow.rows[0].email]
+    );
+
+    res.status(201).json({ profile });
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'Profilo già esistente' });
     res.status(500).json({ error: 'Errore server' });

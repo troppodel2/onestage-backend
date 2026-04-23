@@ -28,7 +28,7 @@ router.get('/:artist_id', async (req, res) => {
 
 // POST /members/:artist_id — aggiungi membro
 router.post('/:artist_id', auth, requireManager, async (req, res) => {
-  const { name, role_in_band, phone, email, is_manager } = req.body;
+  const { name, roles, phone, email, is_manager } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome è obbligatorio' });
 
   // Se c'è email, prova a collegare all'utente registrato
@@ -39,24 +39,24 @@ router.post('/:artist_id', auth, requireManager, async (req, res) => {
   }
 
   const { rows } = await db.query(
-    `INSERT INTO band_members (artist_id, user_id, name, role_in_band, phone, email, is_manager)
+    `INSERT INTO band_members (artist_id, user_id, name, roles, phone, email, is_manager)
      VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-    [req.params.artist_id, user_id, name.trim(), role_in_band, phone, email?.toLowerCase(), is_manager ?? false]
+    [req.params.artist_id, user_id, name.trim(), roles ?? [], phone, email?.toLowerCase(), is_manager ?? false]
   );
   res.status(201).json({ member: rows[0] });
 });
 
 // PATCH /members/:artist_id/:member_id — modifica membro
 router.patch('/:artist_id/:member_id', auth, requireManager, async (req, res) => {
-  const { name, role_in_band, phone, email, is_manager } = req.body;
+  const { name, roles, phone, email, is_manager } = req.body;
   const fields = [];
   const params = [];
 
-  if (name        !== undefined) { params.push(name);        fields.push(`name = $${params.length}`); }
-  if (role_in_band!== undefined) { params.push(role_in_band);fields.push(`role_in_band = $${params.length}`); }
-  if (phone       !== undefined) { params.push(phone);       fields.push(`phone = $${params.length}`); }
-  if (email       !== undefined) { params.push(email);       fields.push(`email = $${params.length}`); }
-  if (is_manager  !== undefined) { params.push(is_manager);  fields.push(`is_manager = $${params.length}`); }
+  if (name       !== undefined) { params.push(name);       fields.push(`name = $${params.length}`); }
+  if (roles      !== undefined) { params.push(roles);      fields.push(`roles = $${params.length}`); }
+  if (phone      !== undefined) { params.push(phone);      fields.push(`phone = $${params.length}`); }
+  if (email      !== undefined) { params.push(email);      fields.push(`email = $${params.length}`); }
+  if (is_manager !== undefined) { params.push(is_manager); fields.push(`is_manager = $${params.length}`); }
 
   if (!fields.length) return res.status(400).json({ error: 'Nessun campo da aggiornare' });
 
