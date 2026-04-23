@@ -12,6 +12,7 @@ app.use('/venues',   require('./routes/venues'));
 app.use('/bookings', require('./routes/bookings'));
 app.use('/events',   require('./routes/events'));
 app.use('/members',  require('./routes/members'));
+app.use('/favorites', require('./routes/favorites'));
 
 app.get('/health', (_, res) => res.json({ status: 'ok', app: 'onestage' }));
 
@@ -36,7 +37,15 @@ const migrations = [
   `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS band_type TEXT`,
   `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS phone TEXT`,
   `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS cachet_max INT`,
+  `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS tribute_artist TEXT`,
   `ALTER TABLE band_members ADD COLUMN IF NOT EXISTS roles TEXT[] DEFAULT '{}'`,
+  `CREATE TABLE IF NOT EXISTS favorites (
+     id         SERIAL PRIMARY KEY,
+     user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     artist_id  INT NOT NULL REFERENCES artist_profiles(id) ON DELETE CASCADE,
+     created_at TIMESTAMP DEFAULT NOW(),
+     UNIQUE(user_id, artist_id)
+   )`,
 ];
 
 (async () => {
