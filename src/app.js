@@ -11,6 +11,7 @@ app.use('/artists',  require('./routes/artists'));
 app.use('/venues',   require('./routes/venues'));
 app.use('/bookings', require('./routes/bookings'));
 app.use('/events',   require('./routes/events'));
+app.use('/members',  require('./routes/members'));
 
 app.get('/health', (_, res) => res.json({ status: 'ok', app: 'onestage' }));
 

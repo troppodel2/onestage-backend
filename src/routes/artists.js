@@ -72,20 +72,20 @@ router.post('/me/profile', auth, async (req, res) => {
   if (req.user.role !== 'artist')
     return res.status(403).json({ error: 'Solo gli artisti possono creare un profilo artista' });
 
-  const { name, bio, city, cachet_min, cachet_max, set_duration_min, set_duration_max,
-          show_types, genres, spotify_url, youtube_url, avatar_url } = req.body;
+  const { name, bio, city, cachet_min, set_duration_min, set_duration_max,
+          genres, band_type, spotify_url, youtube_url, photo_url, phone } = req.body;
   if (!name || !city)
     return res.status(400).json({ error: 'name e city sono obbligatori' });
 
   try {
     const { rows } = await db.query(
       `INSERT INTO artist_profiles
-         (user_id, name, bio, city, cachet_min, cachet_max, set_duration_min, set_duration_max,
-          show_types, genres, spotify_url, youtube_url, avatar_url)
+         (user_id, name, bio, city, cachet_min, set_duration_min, set_duration_max,
+          genres, band_type, spotify_url, youtube_url, photo_url, phone)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING *`,
-      [req.user.id, name, bio, city, cachet_min, cachet_max, set_duration_min, set_duration_max,
-       show_types ?? [], genres ?? [], spotify_url, youtube_url, avatar_url]
+      [req.user.id, name, bio, city, cachet_min, set_duration_min, set_duration_max,
+       genres ?? [], band_type, spotify_url, youtube_url, photo_url, phone]
     );
     res.status(201).json({ profile: rows[0] });
   } catch (e) {
@@ -99,8 +99,8 @@ router.patch('/me/profile', auth, async (req, res) => {
   if (req.user.role !== 'artist')
     return res.status(403).json({ error: 'Accesso negato' });
 
-  const fields = ['name','bio','city','cachet_min','cachet_max','set_duration_min',
-                  'set_duration_max','show_types','genres','spotify_url','youtube_url','avatar_url'];
+  const fields = ['name','bio','city','cachet_min','set_duration_min','set_duration_max',
+                  'genres','band_type','spotify_url','youtube_url','photo_url','phone'];
   const updates = [];
   const params  = [];
 
