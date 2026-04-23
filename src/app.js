@@ -10,6 +10,7 @@ app.use('/auth',     require('./routes/auth'));
 app.use('/artists',  require('./routes/artists'));
 app.use('/venues',   require('./routes/venues'));
 app.use('/bookings', require('./routes/bookings'));
+app.use('/events',   require('./routes/events'));
 
 app.get('/health', (_, res) => res.json({ status: 'ok', app: 'onestage' }));
 

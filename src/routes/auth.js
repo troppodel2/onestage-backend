@@ -28,8 +28,8 @@ router.post('/register', async (req, res) => {
   const { email, username, password, role, privacy_accepted } = req.body;
   if (!email || !username || !password || !role)
     return res.status(400).json({ error: 'email, username, password e role sono obbligatori' });
-  if (!['artist', 'venue'].includes(role))
-    return res.status(400).json({ error: 'role deve essere artist o venue' });
+  if (!['artist', 'venue', 'visitor'].includes(role))
+    return res.status(400).json({ error: 'role deve essere artist, venue o visitor' });
   if (!privacy_accepted)
     return res.status(400).json({ error: 'Devi accettare l\'informativa sulla privacy.', code: 'PRIVACY_REQUIRED' });
   const pwdError = validatePassword(password);
