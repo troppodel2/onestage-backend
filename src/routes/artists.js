@@ -41,7 +41,7 @@ router.get('/', optionalAuth, async (req, res) => {
 
   try {
     const { rows } = await db.query(
-      `SELECT ap.id, ap.user_id, ap.name, ap.city, ap.genres, ap.cachet_min, ap.cachet_max,
+      `SELECT ap.id, ap.user_id, ap.name, ap.city, ap.genres, ap.cachet_min,
               ap.avatar_url, ap.is_verified, ap.band_type,
               u.plan
        FROM artist_profiles ap
