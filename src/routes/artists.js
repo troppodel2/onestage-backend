@@ -65,7 +65,16 @@ router.get('/', optionalAuth, async (req, res) => {
        LIMIT $${params.length - 1} OFFSET $${params.length}`,
       params
     );
-    res.json({ artists: rows });
+
+    // Cachet visibile solo a venue/organizzatori e al proprietario della band
+    const canSeeAllCachet = req.user?.role === 'venue';
+    const userId = req.user?.id ?? null;
+    const artists = rows.map(r => {
+      if (canSeeAllCachet || r.user_id === userId) return r;
+      return { ...r, cachet_min: null };
+    });
+
+    res.json({ artists });
   } catch (e) {
     console.error('GET /artists error:', e.message);
     res.status(500).json({ error: 'Errore server', detail: e.message });
@@ -137,8 +146,15 @@ router.get('/:id', optionalAuth, async (req, res) => {
   if (!rows[0]) return res.status(404).json({ error: 'Artista non trovato' });
 
   const artist = { ...rows[0] };
-  const isPro  = req.user?.plan === 'pro';
+
+  // Contatti: solo utenti Pro
+  const isPro = req.user?.plan === 'pro';
   if (!isPro) delete artist.contact_email;
+
+  // Cachet: solo venue/organizzatori e proprietario della band
+  const canSeeCachet = req.user?.role === 'venue' || req.user?.id === artist.user_id;
+  if (!canSeeCachet) artist.cachet_min = null;
+
   res.json({ artist });
 });
 
