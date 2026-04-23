@@ -130,8 +130,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
 // PATCH /artists/:id — aggiorna band specifica (solo proprietario)
 router.patch('/:id', auth, requireOwner, async (req, res) => {
-  const fields = ['name','bio','city','cachet_min','set_duration_min','set_duration_max',
-                  'genres','band_type','spotify_url','youtube_url','avatar_url','phone'];
+  const fields = ['name','bio','city','cachet_min','cachet_max','set_duration_min','set_duration_max',
+                  'genres','band_type','tribute_artist','spotify_url','youtube_url','avatar_url','phone'];
   const updates = [];
   const params  = [];
 
