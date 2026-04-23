@@ -1,9 +1,10 @@
-const router = require('express').Router();
-const db     = require('../db');
-const auth   = require('../middleware/auth');
+const router       = require('express').Router();
+const db           = require('../db');
+const auth         = require('../middleware/auth');
+const optionalAuth = require('../middleware/optionalAuth');
 
 // GET /venues — lista pubblica con filtri
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   const { city, genre, capacity_min, limit = 20, offset = 0 } = req.query;
   const conditions = [];
   const params = [];
@@ -38,17 +39,23 @@ router.get('/', async (req, res) => {
   res.json({ venues: rows });
 });
 
-// GET /venues/:id — profilo pubblico singolo
-router.get('/:id', async (req, res) => {
+// GET /venues/:id — profilo pubblico singolo (contatti solo per Pro loggati)
+router.get('/:id', optionalAuth, async (req, res) => {
   const { rows } = await db.query(
-    `SELECT vp.*, u.plan, u.username
+    `SELECT vp.*, u.plan, u.username, u.email AS contact_email
      FROM venue_profiles vp
      JOIN users u ON u.id = vp.user_id
      WHERE vp.id = $1`,
     [req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Venue non trovata' });
-  res.json({ venue: rows[0] });
+
+  const venue = { ...rows[0] };
+  const isPro = req.user?.plan === 'pro';
+  if (!isPro) {
+    delete venue.contact_email;
+  }
+  res.json({ venue });
 });
 
 // GET /venues/me/profile

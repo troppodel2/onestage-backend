@@ -1,9 +1,10 @@
-const router = require('express').Router();
-const db     = require('../db');
-const auth   = require('../middleware/auth');
+const router       = require('express').Router();
+const db           = require('../db');
+const auth         = require('../middleware/auth');
+const optionalAuth = require('../middleware/optionalAuth');
 
 // GET /artists — lista pubblica con filtri
-router.get('/', async (req, res) => {
+router.get('/', optionalAuth, async (req, res) => {
   const { city, genre, cachet_max, limit = 20, offset = 0 } = req.query;
   const conditions = [];
   const params = [];
@@ -38,17 +39,23 @@ router.get('/', async (req, res) => {
   res.json({ artists: rows });
 });
 
-// GET /artists/:id — profilo pubblico singolo
-router.get('/:id', async (req, res) => {
+// GET /artists/:id — profilo pubblico singolo (contatti solo per Pro loggati)
+router.get('/:id', optionalAuth, async (req, res) => {
   const { rows } = await db.query(
-    `SELECT ap.*, u.plan, u.username
+    `SELECT ap.*, u.plan, u.username, u.email AS contact_email
      FROM artist_profiles ap
      JOIN users u ON u.id = ap.user_id
      WHERE ap.id = $1`,
     [req.params.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Artista non trovato' });
-  res.json({ artist: rows[0] });
+
+  const artist = { ...rows[0] };
+  const isPro  = req.user?.plan === 'pro';
+  if (!isPro) {
+    delete artist.contact_email;
+  }
+  res.json({ artist });
 });
 
 // GET /artists/me/profile — profilo dell'utente loggato
