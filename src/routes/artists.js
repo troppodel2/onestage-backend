@@ -39,18 +39,23 @@ router.get('/', optionalAuth, async (req, res) => {
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   params.push(parseInt(limit), parseInt(offset));
 
-  const { rows } = await db.query(
-    `SELECT ap.id, ap.user_id, ap.name, ap.city, ap.genres, ap.cachet_min, ap.cachet_max,
-            ap.show_types, ap.avatar_url, ap.is_verified, ap.band_type,
-            u.plan
-     FROM artist_profiles ap
-     JOIN users u ON u.id = ap.user_id
-     ${where}
-     ORDER BY u.plan DESC, ap.name ASC
-     LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
-  res.json({ artists: rows });
+  try {
+    const { rows } = await db.query(
+      `SELECT ap.id, ap.user_id, ap.name, ap.city, ap.genres, ap.cachet_min, ap.cachet_max,
+              ap.avatar_url, ap.is_verified, ap.band_type,
+              u.plan
+       FROM artist_profiles ap
+       JOIN users u ON u.id = ap.user_id
+       ${where}
+       ORDER BY u.plan DESC, ap.name ASC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+    res.json({ artists: rows });
+  } catch (e) {
+    console.error('GET /artists error:', e.message);
+    res.status(500).json({ error: 'Errore server', detail: e.message });
+  }
 });
 
 // ── Rotte autenticate /me — DEVONO stare prima di /:id ───────────────────────
