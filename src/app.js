@@ -46,6 +46,9 @@ const migrations = [
      created_at TIMESTAMP DEFAULT NOW(),
      UNIQUE(user_id, artist_id)
    )`,
+  `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS website_url TEXT`,
+  `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS facebook_url TEXT`,
+  `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS instagram_url TEXT`,
   `CREATE TABLE IF NOT EXISTS events (
      id          SERIAL PRIMARY KEY,
      booking_id  INT REFERENCES bookings(id) ON DELETE SET NULL,
