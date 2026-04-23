@@ -35,6 +35,7 @@ const migrations = [
   // Colonne aggiuntive non presenti nello schema iniziale
   `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS band_type TEXT`,
   `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS phone TEXT`,
+  `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS cachet_max INT`,
   `ALTER TABLE band_members ADD COLUMN IF NOT EXISTS roles TEXT[] DEFAULT '{}'`,
 ];
 
