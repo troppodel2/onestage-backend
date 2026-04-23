@@ -19,7 +19,7 @@ async function requireOwner(req, res, next) {
 
 // GET /artists — lista pubblica con filtri
 router.get('/', optionalAuth, async (req, res) => {
-  const { q, city, genre, cachet_max, limit = 20, offset = 0 } = req.query;
+  const { q, city, genre, genres, band_types, cachet_max, limit = 20, offset = 0 } = req.query;
   const conditions = [];
   const params = [];
 
@@ -30,10 +30,21 @@ router.get('/', optionalAuth, async (req, res) => {
     params.push(`%${city}%`);
     conditions.push(`ap.city ILIKE $${params.length}`);
   }
-  if (genre) {
-    params.push(genre);
-    conditions.push(`$${params.length} = ANY(ap.genres)`);
+
+  // genres: multi-select comma-separated (es. "Rock,Metal,Pop")
+  const genreList = genres ? genres.split(',').filter(Boolean) : genre ? [genre] : [];
+  if (genreList.length > 0) {
+    params.push(genreList);
+    conditions.push(`ap.genres && $${params.length}::text[]`);
   }
+
+  // band_types: multi-select comma-separated (es. "tribute,cover")
+  const bandTypeList = band_types ? band_types.split(',').filter(Boolean) : [];
+  if (bandTypeList.length > 0) {
+    params.push(bandTypeList);
+    conditions.push(`ap.band_type = ANY($${params.length}::text[])`);
+  }
+
   if (cachet_max) {
     params.push(parseInt(cachet_max));
     conditions.push(`ap.cachet_min <= $${params.length}`);
