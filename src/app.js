@@ -30,7 +30,12 @@ const db   = require('./db');
 
 // Migrazioni runtime — aggiornamenti incrementali al DB
 const migrations = [
-  // future ALTER TABLE qui
+  // Permette più band per utente (rimuove vincolo UNIQUE su user_id)
+  `ALTER TABLE artist_profiles DROP CONSTRAINT IF EXISTS artist_profiles_user_id_key`,
+  // Colonne aggiuntive non presenti nello schema iniziale
+  `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS band_type TEXT`,
+  `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS phone TEXT`,
+  `ALTER TABLE band_members ADD COLUMN IF NOT EXISTS roles TEXT[] DEFAULT '{}'`,
 ];
 
 (async () => {
