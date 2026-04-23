@@ -147,11 +147,14 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
   const artist = { ...rows[0] };
 
-  // Contatti: solo utenti Pro
-  const isPro = req.user?.plan === 'pro';
-  if (!isPro) delete artist.contact_email;
+  // Email e telefono: solo venue con piano Pro
+  const isVenuePro = req.user?.role === 'venue' && req.user?.plan === 'pro';
+  if (!isVenuePro) {
+    delete artist.contact_email;
+    artist.phone = null;
+  }
 
-  // Cachet: solo venue/organizzatori e proprietario della band
+  // Cachet: solo venue e proprietario della band
   const canSeeCachet = req.user?.role === 'venue' || req.user?.id === artist.user_id;
   if (!canSeeCachet) artist.cachet_min = null;
 
