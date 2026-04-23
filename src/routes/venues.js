@@ -5,11 +5,14 @@ const optionalAuth = require('../middleware/optionalAuth');
 
 // GET /venues — lista pubblica con filtri
 router.get('/', optionalAuth, async (req, res) => {
-  const { city, genre, capacity_min, limit = 20, offset = 0 } = req.query;
+  const { q, city, genre, capacity_min, limit = 20, offset = 0 } = req.query;
   const conditions = [];
   const params = [];
 
-  if (city) {
+  if (q) {
+    params.push(`%${q}%`);
+    conditions.push(`(vp.name ILIKE $${params.length} OR vp.city ILIKE $${params.length})`);
+  } else if (city) {
     params.push(`%${city}%`);
     conditions.push(`vp.city ILIKE $${params.length}`);
   }

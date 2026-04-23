@@ -19,11 +19,14 @@ async function requireOwner(req, res, next) {
 
 // GET /artists — lista pubblica con filtri
 router.get('/', optionalAuth, async (req, res) => {
-  const { city, genre, cachet_max, limit = 20, offset = 0 } = req.query;
+  const { q, city, genre, cachet_max, limit = 20, offset = 0 } = req.query;
   const conditions = [];
   const params = [];
 
-  if (city) {
+  if (q) {
+    params.push(`%${q}%`);
+    conditions.push(`(ap.name ILIKE $${params.length} OR ap.city ILIKE $${params.length})`);
+  } else if (city) {
     params.push(`%${city}%`);
     conditions.push(`ap.city ILIKE $${params.length}`);
   }
