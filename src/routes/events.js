@@ -27,19 +27,24 @@ router.get('/', async (req, res) => {
 
   params.push(parseInt(limit), parseInt(offset));
 
-  const { rows } = await db.query(
-    `SELECT e.id, e.event_date, e.title, e.description,
-            ap.name AS artist_name, ap.city AS artist_city, ap.genres, ap.avatar_url AS artist_avatar,
-            vp.name AS venue_name, vp.city AS venue_city, vp.address, vp.avatar_url AS venue_avatar
-     FROM events e
-     JOIN artist_profiles ap ON ap.id = e.artist_id
-     JOIN venue_profiles  vp ON vp.id = e.venue_id
-     WHERE ${conditions.join(' AND ')}
-     ORDER BY e.event_date ASC
-     LIMIT $${params.length - 1} OFFSET $${params.length}`,
-    params
-  );
-  res.json({ events: rows });
+  try {
+    const { rows } = await db.query(
+      `SELECT e.id, e.event_date, e.title, e.description,
+              ap.name AS artist_name, ap.city AS artist_city, ap.genres, ap.avatar_url AS artist_avatar,
+              vp.name AS venue_name, vp.city AS venue_city, vp.address, vp.avatar_url AS venue_avatar
+       FROM events e
+       JOIN artist_profiles ap ON ap.id = e.artist_id
+       JOIN venue_profiles  vp ON vp.id = e.venue_id
+       WHERE ${conditions.join(' AND ')}
+       ORDER BY e.event_date ASC
+       LIMIT $${params.length - 1} OFFSET $${params.length}`,
+      params
+    );
+    res.json({ events: rows });
+  } catch (e) {
+    console.error('GET /events error:', e.message);
+    res.json({ events: [] });
+  }
 });
 
 // GET /events/:id — singolo evento

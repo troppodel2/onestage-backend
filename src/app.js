@@ -46,6 +46,17 @@ const migrations = [
      created_at TIMESTAMP DEFAULT NOW(),
      UNIQUE(user_id, artist_id)
    )`,
+  `CREATE TABLE IF NOT EXISTS events (
+     id          SERIAL PRIMARY KEY,
+     booking_id  INT REFERENCES bookings(id) ON DELETE SET NULL,
+     venue_id    INT NOT NULL REFERENCES venue_profiles(id) ON DELETE CASCADE,
+     artist_id   INT NOT NULL REFERENCES artist_profiles(id) ON DELETE CASCADE,
+     event_date  DATE NOT NULL,
+     title       TEXT,
+     description TEXT,
+     is_public   BOOLEAN DEFAULT true,
+     created_at  TIMESTAMP DEFAULT NOW()
+   )`,
 ];
 
 (async () => {
