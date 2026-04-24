@@ -87,7 +87,7 @@ router.get('/', optionalAuth, async (req, res) => {
 router.get('/me/profiles', auth, async (req, res) => {
   const { rows } = await db.query(
     `SELECT ap.*,
-            (SELECT COUNT(*) FROM band_members bm WHERE bm.artist_id = ap.id) AS member_count,
+            (SELECT COUNT(*) FROM band_members bm WHERE bm.artist_id = ap.id AND bm.member_type = 'performer') AS member_count,
             (SELECT COUNT(*) FROM favorites f WHERE f.artist_id = ap.id) AS favorites_count
      FROM artist_profiles ap
      WHERE ap.user_id = $1
