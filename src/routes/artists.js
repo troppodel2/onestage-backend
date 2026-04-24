@@ -158,9 +158,10 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
   const artist = { ...rows[0] };
 
-  // Email e telefono: solo venue con piano Pro
+  // Email e telefono: venue Pro + proprietario della band
+  const isOwner    = req.user?.id === artist.user_id;
   const isVenuePro = req.user?.role === 'venue' && req.user?.plan === 'pro';
-  if (!isVenuePro) {
+  if (!isVenuePro && !isOwner) {
     delete artist.contact_email;
     artist.phone = null;
   }
