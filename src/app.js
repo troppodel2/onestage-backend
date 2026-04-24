@@ -47,7 +47,9 @@ const migrations = [
      UNIQUE(user_id, artist_id)
    )`,
   `ALTER TABLE band_members ADD COLUMN IF NOT EXISTS member_type TEXT DEFAULT 'performer'`,
-  `UPDATE band_members SET member_type = 'staff' WHERE is_manager = true AND member_type = 'performer'`,
+  `ALTER TABLE band_members ADD COLUMN IF NOT EXISTS is_performer BOOLEAN DEFAULT true`,
+  `ALTER TABLE band_members ADD COLUMN IF NOT EXISTS contact_visible BOOLEAN DEFAULT false`,
+  `UPDATE band_members SET member_type = 'staff', is_performer = false WHERE is_manager = true AND member_type = 'performer'`,
   `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS website_url TEXT`,
   `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS facebook_url TEXT`,
   `ALTER TABLE artist_profiles ADD COLUMN IF NOT EXISTS instagram_url TEXT`,

@@ -2,36 +2,56 @@ const router = require('express').Router();
 const db     = require('../db');
 const auth   = require('../middleware/auth');
 
-// Verifica che l'utente loggato sia proprietario della band
 async function requireOwner(req, res, next) {
   const { rows } = await db.query(
-    `SELECT ap.id FROM artist_profiles ap WHERE ap.user_id = $1 AND ap.id = $2`,
+    'SELECT id FROM artist_profiles WHERE user_id = $1 AND id = $2',
     [req.user.id, req.params.artist_id]
   );
   if (!rows[0]) return res.status(403).json({ error: 'Non sei il proprietario di questa band' });
   next();
 }
 
-// GET /members/:artist_id — lista tutti (performer + staff)
+// GET /members/:artist_id
+// - Pubblico: nome, ruoli, is_performer
+// - Venue: + contatto se contact_visible = true
+// - Venue Pro: + contatto anche se contact_visible = false
 router.get('/:artist_id', async (req, res) => {
+  // Determina il livello di accesso dal token opzionale
+  let userRole = null, userPlan = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader) {
+    try {
+      const jwt = require('jsonwebtoken');
+      const decoded = jwt.verify(authHeader.replace('Bearer ', ''), process.env.JWT_SECRET);
+      userRole = decoded.role;
+      userPlan = decoded.plan;
+    } catch {}
+  }
+
+  const isVenue    = userRole === 'venue';
+  const isVenuePro = isVenue && userPlan === 'pro';
+
   const { rows } = await db.query(
-    `SELECT bm.*, u.username
-     FROM band_members bm
-     LEFT JOIN users u ON u.id = bm.user_id
-     WHERE bm.artist_id = $1
-     ORDER BY bm.member_type ASC, bm.is_manager DESC, bm.created_at ASC`,
-    [req.params.artist_id]
+    `SELECT id, name, roles, is_performer, is_manager, member_type, contact_visible,
+            user_id,
+            CASE WHEN $1 OR (contact_visible = true AND $2) THEN phone ELSE NULL END AS phone,
+            CASE WHEN $1 THEN email ELSE NULL END AS email
+     FROM band_members
+     WHERE artist_id = $3
+     ORDER BY is_performer DESC, is_manager DESC, created_at ASC`,
+    [isVenuePro, isVenue, req.params.artist_id]
   );
   res.json({ members: rows });
 });
 
-// POST /members/:artist_id — aggiungi membro o staff
+// POST /members/:artist_id — aggiungi membro
 router.post('/:artist_id', auth, requireOwner, async (req, res) => {
-  const { name, roles, phone, email, member_type = 'performer' } = req.body;
+  const { name, roles, phone, email, is_performer = true, contact_visible = false } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: 'Il nome è obbligatorio' });
 
-  // is_manager = true solo se member_type è 'staff' e ruolo è Manager
-  const isManager = member_type === 'staff' && (roles ?? []).includes('Manager');
+  const isManager = (roles ?? []).some(r =>
+    ['Manager', 'Booking Agent'].includes(r)
+  );
 
   let user_id = null;
   if (email) {
@@ -41,9 +61,16 @@ router.post('/:artist_id', auth, requireOwner, async (req, res) => {
 
   try {
     const { rows } = await db.query(
-      `INSERT INTO band_members (artist_id, user_id, name, roles, phone, email, is_manager, member_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
-      [req.params.artist_id, user_id, name.trim(), roles ?? [], phone, email?.toLowerCase(), isManager, member_type]
+      `INSERT INTO band_members
+         (artist_id, user_id, name, roles, phone, email, is_manager, is_performer, contact_visible, member_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+      [
+        req.params.artist_id, user_id, name.trim(), roles ?? [],
+        phone || null, email?.toLowerCase() || null,
+        isManager, is_performer,
+        contact_visible,
+        is_performer ? 'performer' : 'staff',
+      ]
     );
     res.status(201).json({ member: rows[0] });
   } catch (e) {
@@ -51,36 +78,37 @@ router.post('/:artist_id', auth, requireOwner, async (req, res) => {
   }
 });
 
-// PATCH /members/:artist_id/:member_id — modifica membro
+// PATCH /members/:artist_id/:member_id
 router.patch('/:artist_id/:member_id', auth, requireOwner, async (req, res) => {
-  const { name, roles, phone, email, member_type } = req.body;
-  const fields = [];
-  const params = [];
+  const allowed = ['name','roles','phone','email','is_performer','contact_visible','member_type'];
+  const fields = [], params = [];
 
-  if (name        !== undefined) { params.push(name);        fields.push(`name = $${params.length}`); }
-  if (roles       !== undefined) { params.push(roles);       fields.push(`roles = $${params.length}`); }
-  if (phone       !== undefined) { params.push(phone);       fields.push(`phone = $${params.length}`); }
-  if (email       !== undefined) { params.push(email);       fields.push(`email = $${params.length}`); }
-  if (member_type !== undefined) { params.push(member_type); fields.push(`member_type = $${params.length}`); }
-
+  for (const f of allowed) {
+    if (req.body[f] !== undefined) {
+      params.push(req.body[f]);
+      fields.push(`${f} = $${params.length}`);
+    }
+  }
   if (!fields.length) return res.status(400).json({ error: 'Nessun campo da aggiornare' });
 
-  params.push(req.params.member_id, req.params.artist_id);
-  try {
-    const { rows } = await db.query(
-      `UPDATE band_members SET ${fields.join(', ')}
-       WHERE id = $${params.length - 1} AND artist_id = $${params.length}
-       RETURNING *`,
-      params
-    );
-    if (!rows[0]) return res.status(404).json({ error: 'Membro non trovato' });
-    res.json({ member: rows[0] });
-  } catch (e) {
-    res.status(500).json({ error: 'Errore server' });
+  // Ricalcola is_manager se cambiano i ruoli
+  if (req.body.roles !== undefined) {
+    const isManager = req.body.roles.some(r => ['Manager','Booking Agent'].includes(r));
+    params.push(isManager);
+    fields.push(`is_manager = $${params.length}`);
   }
+
+  params.push(req.params.member_id, req.params.artist_id);
+  const { rows } = await db.query(
+    `UPDATE band_members SET ${fields.join(', ')}
+     WHERE id = $${params.length - 1} AND artist_id = $${params.length} RETURNING *`,
+    params
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Membro non trovato' });
+  res.json({ member: rows[0] });
 });
 
-// DELETE /members/:artist_id/:member_id — rimuovi membro/staff
+// DELETE /members/:artist_id/:member_id
 router.delete('/:artist_id/:member_id', auth, requireOwner, async (req, res) => {
   const { rows } = await db.query(
     'DELETE FROM band_members WHERE id = $1 AND artist_id = $2 RETURNING id',
