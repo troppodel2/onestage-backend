@@ -94,6 +94,18 @@ router.patch('/me/push-token', require('../middleware/auth'), async (req, res) =
   res.json({ ok: true });
 });
 
+// PATCH /auth/me/plan — [DEV ONLY] toggle piano pro/free
+router.patch('/me/plan', require('../middleware/auth'), async (req, res) => {
+  const { plan } = req.body;
+  if (!['free', 'pro'].includes(plan))
+    return res.status(400).json({ error: 'plan deve essere free o pro' });
+  const { rows } = await db.query(
+    'UPDATE users SET plan = $1 WHERE id = $2 RETURNING id, email, username, role, plan',
+    [plan, req.user.id]
+  );
+  res.json({ user: rows[0] });
+});
+
 // DELETE /auth/me — cancella account
 router.delete('/me', require('../middleware/auth'), async (req, res) => {
   const client = await db.connect();
