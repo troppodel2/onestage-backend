@@ -16,29 +16,18 @@ async function requireOwner(req, res, next) {
 // - Venue: + contatto se contact_visible = true
 // - Venue Pro: + contatto anche se contact_visible = false
 router.get('/:artist_id', async (req, res) => {
-  // Determina il livello di accesso dal token opzionale
-  let userId = null, userRole = null;
+  // Legge userId dal token opzionale
+  let userId = null;
   const authHeader = req.headers.authorization;
   if (authHeader) {
     try {
       const jwt = require('jsonwebtoken');
       const decoded = jwt.verify(authHeader.replace('Bearer ', ''), process.env.JWT_SECRET);
-      userId   = decoded.id;
-      userRole = decoded.role;
+      userId = decoded.id;
     } catch {}
   }
 
-  // Piano dal DB (il JWT non include plan per evitare dati stale)
-  let userPlan = null;
-  if (userId) {
-    const { rows: planRows } = await db.query('SELECT plan FROM users WHERE id = $1', [userId]);
-    userPlan = planRows[0]?.plan ?? null;
-  }
-
-  const isVenue    = userRole === 'venue';
-  const isVenuePro = isVenue && userPlan === 'pro';
-
-  // Il proprietario della band vede tutto
+  // Solo il proprietario della band vede phone/email dei membri
   let isOwner = false;
   if (userId) {
     const { rows: ownerRows } = await db.query(
@@ -48,8 +37,8 @@ router.get('/:artist_id', async (req, res) => {
     isOwner = ownerRows.length > 0;
   }
 
-  const showAll      = isVenuePro || isOwner;
-  const showIfPublic = false; // contatti solo a venue Pro e proprietario
+  const showAll      = isOwner;
+  const showIfPublic = false;
 
   const { rows } = await db.query(
     `SELECT id, name, roles, is_performer, is_manager, member_type, contact_visible,

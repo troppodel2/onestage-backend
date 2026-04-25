@@ -158,17 +158,23 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
   const artist = { ...rows[0] };
 
-  // Legge il piano dal DB (il JWT non contiene plan per evitare dati stale)
-  let callerPlan = null;
-  if (req.user?.id) {
-    const { rows: pr } = await db.query('SELECT plan FROM users WHERE id = $1', [req.user.id]);
-    callerPlan = pr[0]?.plan ?? null;
+  const isOwner = req.user?.id === artist.user_id;
+
+  // Contatti visibili al proprietario OPPURE a venue con booking confermato
+  let hasConfirmedBooking = false;
+  if (!isOwner && req.user?.id) {
+    const { rows: br } = await db.query(
+      `SELECT id FROM booking_requests
+       WHERE status = 'confirmed'
+         AND ((from_user_id = $1 AND to_user_id = $2)
+           OR (from_user_id = $2 AND to_user_id = $1))
+       LIMIT 1`,
+      [req.user.id, artist.user_id]
+    );
+    hasConfirmedBooking = br.length > 0;
   }
 
-  // Email e telefono: venue Pro + proprietario della band
-  const isOwner    = req.user?.id === artist.user_id;
-  const isVenuePro = req.user?.role === 'venue' && callerPlan === 'pro';
-  if (!isVenuePro && !isOwner) {
+  if (!isOwner && !hasConfirmedBooking) {
     delete artist.contact_email;
     artist.phone = null;
   }
