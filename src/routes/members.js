@@ -49,7 +49,7 @@ router.get('/:artist_id', async (req, res) => {
   }
 
   const showAll      = isVenuePro || isOwner;
-  const showIfPublic = isVenue && !isVenuePro;
+  const showIfPublic = false; // contatti solo a venue Pro e proprietario
 
   const { rows } = await db.query(
     `SELECT id, name, roles, is_performer, is_manager, member_type, contact_visible,
