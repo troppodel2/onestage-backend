@@ -158,9 +158,16 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
   const artist = { ...rows[0] };
 
+  // Legge il piano dal DB (il JWT non contiene plan per evitare dati stale)
+  let callerPlan = null;
+  if (req.user?.id) {
+    const { rows: pr } = await db.query('SELECT plan FROM users WHERE id = $1', [req.user.id]);
+    callerPlan = pr[0]?.plan ?? null;
+  }
+
   // Email e telefono: venue Pro + proprietario della band
   const isOwner    = req.user?.id === artist.user_id;
-  const isVenuePro = req.user?.role === 'venue' && req.user?.plan === 'pro';
+  const isVenuePro = req.user?.role === 'venue' && callerPlan === 'pro';
   if (!isVenuePro && !isOwner) {
     delete artist.contact_email;
     artist.phone = null;
