@@ -152,7 +152,7 @@ router.post('/:id/messages', auth, async (req, res) => {
   if (!body?.trim()) return res.status(400).json({ error: 'Il messaggio non può essere vuoto' });
 
   const { rows: access } = await db.query(
-    'SELECT id FROM booking_requests WHERE id = $1 AND (from_user_id = $2 OR to_user_id = $2)',
+    'SELECT br.*, fu.username AS from_username, tu.username AS to_username, fu.push_token AS from_push, tu.push_token AS to_push FROM booking_requests br JOIN users fu ON fu.id = br.from_user_id JOIN users tu ON tu.id = br.to_user_id WHERE br.id = $1 AND (br.from_user_id = $2 OR br.to_user_id = $2)',
     [req.params.id, req.user.id]
   );
   if (!access[0]) return res.status(403).json({ error: 'Accesso negato' });
@@ -161,6 +161,19 @@ router.post('/:id/messages', auth, async (req, res) => {
     'INSERT INTO messages (booking_id, sender_id, body) VALUES ($1, $2, $3) RETURNING *',
     [req.params.id, req.user.id, body.trim()]
   );
+
+  // Push all'altro partecipante
+  const booking = access[0];
+  const isSender = req.user.id === booking.from_user_id;
+  const otherPush = isSender ? booking.to_push : booking.from_push;
+  const senderName = isSender ? booking.from_username : booking.to_username;
+  const dateStr = new Date(booking.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+  sendPush(otherPush, {
+    title: `💬 ${senderName}`,
+    body: body.trim().length > 80 ? body.trim().slice(0, 77) + '…' : body.trim(),
+    data: { bookingId: booking.id, screen: 'BookingDetail', eventDate: dateStr },
+  });
+
   res.status(201).json({ message: rows[0] });
 });
 
