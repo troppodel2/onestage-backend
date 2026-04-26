@@ -1,6 +1,7 @@
-const router = require('express').Router();
-const db     = require('../db');
-const auth   = require('../middleware/auth');
+const router     = require('express').Router();
+const db         = require('../db');
+const auth       = require('../middleware/auth');
+const { sendPush } = require('../utils/push');
 
 // POST /bookings — invia richiesta data
 router.post('/', auth, async (req, res) => {
@@ -32,6 +33,21 @@ router.post('/', auth, async (req, res) => {
        RETURNING *`,
       [req.user.id, to_user_id, event_date, proposed_cachet, notes]
     );
+
+    // Push al destinatario
+    const { rows: recipientRows } = await db.query(
+      'SELECT push_token, username FROM users WHERE id = $1', [to_user_id]
+    );
+    const { rows: senderRows } = await db.query(
+      'SELECT username FROM users WHERE id = $1', [req.user.id]
+    );
+    const dateStr = new Date(event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+    sendPush(recipientRows[0]?.push_token, {
+      title: '🎵 Nuova richiesta di booking',
+      body: `${senderRows[0]?.username} ti ha inviato una proposta per il ${dateStr}`,
+      data: { bookingId: rows[0].id, screen: 'BookingDetail' },
+    });
+
     res.status(201).json({ booking: rows[0] });
   } catch (e) {
     res.status(500).json({ error: 'Errore server' });
@@ -84,6 +100,27 @@ router.patch('/:id/status', auth, async (req, res) => {
     [status, req.params.id, req.user.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
+
+  // Push all'altro utente
+  const booking = rows[0];
+  const otherId = booking.from_user_id === req.user.id ? booking.to_user_id : booking.from_user_id;
+  const { rows: otherRows } = await db.query('SELECT push_token, username FROM users WHERE id = $1', [otherId]);
+  const { rows: actorRows } = await db.query('SELECT username FROM users WHERE id = $1', [req.user.id]);
+  const statusMessages = {
+    confirmed:   '✅ Richiesta confermata!',
+    rejected:    '❌ Richiesta rifiutata',
+    negotiating: '💬 Trattativa aperta',
+    cancelled:   '🚫 Richiesta cancellata',
+  };
+  if (statusMessages[status]) {
+    const dateStr = new Date(booking.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+    sendPush(otherRows[0]?.push_token, {
+      title: statusMessages[status],
+      body: `${actorRows[0]?.username} — ${dateStr}`,
+      data: { bookingId: booking.id, screen: 'BookingDetail' },
+    });
+  }
+
   res.json({ booking: rows[0] });
 });
 
