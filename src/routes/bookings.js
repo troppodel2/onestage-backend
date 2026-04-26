@@ -88,16 +88,18 @@ router.get('/:id', auth, async (req, res) => {
 
 // PATCH /bookings/:id/status — cambia stato (confirmed, rejected, cancelled)
 router.patch('/:id/status', auth, async (req, res) => {
-  const { status } = req.body;
+  const { status, rejection_reason } = req.body;
   const allowed = ['confirmed', 'rejected', 'cancelled', 'negotiating'];
   if (!allowed.includes(status))
     return res.status(400).json({ error: `status deve essere uno di: ${allowed.join(', ')}` });
 
   const { rows } = await db.query(
-    `UPDATE booking_requests SET status = $1
+    `UPDATE booking_requests
+     SET status = $1,
+         rejection_reason = CASE WHEN $1 IN ('rejected','cancelled') THEN $4 ELSE rejection_reason END
      WHERE id = $2 AND (from_user_id = $3 OR to_user_id = $3)
      RETURNING *`,
-    [status, req.params.id, req.user.id]
+    [status, req.params.id, req.user.id, rejection_reason ?? null]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
 

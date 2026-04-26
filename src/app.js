@@ -64,11 +64,48 @@ const migrations = [
      is_public   BOOLEAN DEFAULT true,
      created_at  TIMESTAMP DEFAULT NOW()
    )`,
+  `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS rejection_reason TEXT`,
+  `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS expired_at TIMESTAMP`,
 ];
+
+// Scadenza automatica: ogni ora marca come 'expired' le richieste pending/negotiating
+// la cui event_date è già passata
+async function expireBookings() {
+  try {
+    const { rows } = await db.query(
+      `UPDATE booking_requests
+       SET status = 'rejected', rejection_reason = 'Scaduta automaticamente — data evento superata', expired_at = NOW()
+       WHERE status IN ('pending', 'negotiating')
+         AND event_date < CURRENT_DATE
+       RETURNING id, from_user_id, to_user_id, event_date`
+    );
+    if (rows.length > 0) {
+      console.log(`[expireBookings] scadute ${rows.length} richieste`);
+      const { sendPush } = require('./utils/push');
+      for (const b of rows) {
+        const [fromRows, toRows] = await Promise.all([
+          db.query('SELECT push_token FROM users WHERE id = $1', [b.from_user_id]),
+          db.query('SELECT push_token FROM users WHERE id = $1', [b.to_user_id]),
+        ]);
+        const dateStr = new Date(b.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+        const msg = { title: '⏰ Richiesta scaduta', body: `La proposta per il ${dateStr} è scaduta automaticamente.`, data: { bookingId: b.id } };
+        sendPush(fromRows.rows[0]?.push_token, msg);
+        sendPush(toRows.rows[0]?.push_token, msg);
+      }
+    }
+  } catch (e) {
+    console.error('[expireBookings] errore:', e.message);
+  }
+}
 
 (async () => {
   for (const sql of migrations) {
     await db.query(sql).catch(e => console.error('Migration error:', e.message));
   }
+
+  // Esegui subito all'avvio, poi ogni ora
+  await expireBookings();
+  setInterval(expireBookings, 60 * 60 * 1000);
+
   app.listen(PORT, () => console.log(`OneStage backend in ascolto su porta ${PORT}`));
 })();
