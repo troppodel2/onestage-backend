@@ -131,8 +131,8 @@ router.delete('/:id', auth, async (req, res) => {
 router.get('/:id', auth, async (req, res) => {
   const { rows } = await db.query(
     `SELECT br.*,
-            fu.username AS from_username,
-            tu.username AS to_username
+            fu.username AS from_username, fu.role AS from_role,
+            tu.username AS to_username,   tu.role AS to_role
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
