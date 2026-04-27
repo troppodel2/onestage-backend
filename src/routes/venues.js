@@ -61,6 +61,16 @@ router.get('/:id', optionalAuth, async (req, res) => {
   res.json({ venue });
 });
 
+// GET /venues/by-user/:userId — venue dell'utente (per navigazione da booking)
+router.get('/by-user/:userId', optionalAuth, async (req, res) => {
+  const { rows } = await db.query(
+    'SELECT vp.*, u.plan FROM venue_profiles vp JOIN users u ON u.id = vp.user_id WHERE vp.user_id = $1 LIMIT 1',
+    [req.params.userId]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Venue non trovata' });
+  res.json({ venue: rows[0] });
+});
+
 // GET /venues/me/profile
 router.get('/me/profile', auth, async (req, res) => {
   const { rows } = await db.query(

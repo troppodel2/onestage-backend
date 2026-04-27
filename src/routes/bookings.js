@@ -97,6 +97,17 @@ router.patch('/:id/archive', auth, async (req, res) => {
   }
 });
 
+// DELETE /bookings/:id — eliminazione definitiva (solo per chi ne fa parte)
+router.delete('/:id', auth, async (req, res) => {
+  const { rows } = await db.query(
+    'SELECT id FROM booking_requests WHERE id = $1 AND (from_user_id = $2 OR to_user_id = $2)',
+    [req.params.id, req.user.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
+  await db.query('DELETE FROM booking_requests WHERE id = $1', [req.params.id]);
+  res.json({ deleted: true });
+});
+
 // GET /bookings/:id — singola richiesta
 router.get('/:id', auth, async (req, res) => {
   const { rows } = await db.query(

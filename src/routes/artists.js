@@ -97,6 +97,16 @@ router.get('/me/profiles', auth, async (req, res) => {
   res.json({ profiles: rows });
 });
 
+// GET /artists/by-user/:userId — prima band dell'utente (per navigazione da booking)
+router.get('/by-user/:userId', optionalAuth, async (req, res) => {
+  const { rows } = await db.query(
+    'SELECT * FROM artist_profiles WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1',
+    [req.params.userId]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Profilo non trovato' });
+  res.json({ artist: rows[0] });
+});
+
 // POST /artists/me/profiles — crea nuova band
 router.post('/me/profiles', auth, async (req, res) => {
   if (req.user.role !== 'artist')
