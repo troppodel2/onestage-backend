@@ -78,6 +78,15 @@ const migrations = [
      deleted_at  TIMESTAMP DEFAULT NOW(),
      PRIMARY KEY (user_id, booking_id)
    )`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS phone TEXT`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS website_url TEXT`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS instagram_url TEXT`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS facebook_url TEXT`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS types TEXT[] DEFAULT '{}'`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS features TEXT[] DEFAULT '{}'`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS budget_estimate INT`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS tech_equipment TEXT[] DEFAULT '{}'`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS requested_band_types TEXT[] DEFAULT '{}'`,
 ];
 
 // Scadenza automatica: ogni ora marca come 'expired' le richieste pending/negotiating
