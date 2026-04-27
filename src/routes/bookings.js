@@ -54,8 +54,9 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// GET /bookings — tutte le richieste dell'utente loggato
+// GET /bookings — richieste attive o archiviate (?archived=true)
 router.get('/', auth, async (req, res) => {
+  const archived = req.query.archived === 'true';
   const { rows } = await db.query(
     `SELECT br.*,
             fu.username AS from_username, fu.role AS from_role,
@@ -63,11 +64,37 @@ router.get('/', auth, async (req, res) => {
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
-     WHERE br.from_user_id = $1 OR br.to_user_id = $1
+     WHERE (br.from_user_id = $1 OR br.to_user_id = $1)
+       AND ${archived
+         ? 'EXISTS (SELECT 1 FROM booking_archives ba WHERE ba.booking_id = br.id AND ba.user_id = $1)'
+         : 'NOT EXISTS (SELECT 1 FROM booking_archives ba WHERE ba.booking_id = br.id AND ba.user_id = $1)'
+       }
      ORDER BY br.created_at DESC`,
     [req.user.id]
   );
   res.json({ bookings: rows });
+});
+
+// PATCH /bookings/:id/archive — toggle archivio per l'utente corrente
+router.patch('/:id/archive', auth, async (req, res) => {
+  const { rows: access } = await db.query(
+    'SELECT id FROM booking_requests WHERE id = $1 AND (from_user_id = $2 OR to_user_id = $2)',
+    [req.params.id, req.user.id]
+  );
+  if (!access[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
+
+  const { rows: existing } = await db.query(
+    'SELECT 1 FROM booking_archives WHERE booking_id = $1 AND user_id = $2',
+    [req.params.id, req.user.id]
+  );
+
+  if (existing.length > 0) {
+    await db.query('DELETE FROM booking_archives WHERE booking_id = $1 AND user_id = $2', [req.params.id, req.user.id]);
+    res.json({ archived: false });
+  } else {
+    await db.query('INSERT INTO booking_archives (booking_id, user_id) VALUES ($1, $2)', [req.params.id, req.user.id]);
+    res.json({ archived: true });
+  }
 });
 
 // GET /bookings/:id — singola richiesta

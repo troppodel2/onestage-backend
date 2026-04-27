@@ -66,6 +66,12 @@ const migrations = [
    )`,
   `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS rejection_reason TEXT`,
   `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS expired_at TIMESTAMP`,
+  `CREATE TABLE IF NOT EXISTS booking_archives (
+     user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     booking_id INT NOT NULL REFERENCES booking_requests(id) ON DELETE CASCADE,
+     archived_at TIMESTAMP DEFAULT NOW(),
+     PRIMARY KEY (user_id, booking_id)
+   )`,
 ];
 
 // Scadenza automatica: ogni ora marca come 'expired' le richieste pending/negotiating
