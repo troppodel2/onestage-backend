@@ -72,6 +72,12 @@ const migrations = [
      archived_at TIMESTAMP DEFAULT NOW(),
      PRIMARY KEY (user_id, booking_id)
    )`,
+  `CREATE TABLE IF NOT EXISTS booking_deletions (
+     user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+     booking_id INT NOT NULL REFERENCES booking_requests(id) ON DELETE CASCADE,
+     deleted_at  TIMESTAMP DEFAULT NOW(),
+     PRIMARY KEY (user_id, booking_id)
+   )`,
 ];
 
 // Scadenza automatica: ogni ora marca come 'expired' le richieste pending/negotiating

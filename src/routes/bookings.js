@@ -65,6 +65,7 @@ router.get('/', auth, async (req, res) => {
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
      WHERE (br.from_user_id = $1 OR br.to_user_id = $1)
+       AND NOT EXISTS (SELECT 1 FROM booking_deletions bd WHERE bd.booking_id = br.id AND bd.user_id = $1)
        AND ${archived
          ? 'EXISTS (SELECT 1 FROM booking_archives ba WHERE ba.booking_id = br.id AND ba.user_id = $1)'
          : 'NOT EXISTS (SELECT 1 FROM booking_archives ba WHERE ba.booking_id = br.id AND ba.user_id = $1)'
@@ -97,14 +98,32 @@ router.patch('/:id/archive', auth, async (req, res) => {
   }
 });
 
-// DELETE /bookings/:id — eliminazione definitiva (solo per chi ne fa parte)
+// DELETE /bookings/:id — soft delete per l'utente corrente
+// Il record viene eliminato dal DB solo quando entrambe le parti l'hanno cancellato
 router.delete('/:id', auth, async (req, res) => {
   const { rows } = await db.query(
-    'SELECT id FROM booking_requests WHERE id = $1 AND (from_user_id = $2 OR to_user_id = $2)',
+    'SELECT id, from_user_id, to_user_id FROM booking_requests WHERE id = $1 AND (from_user_id = $2 OR to_user_id = $2)',
     [req.params.id, req.user.id]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
-  await db.query('DELETE FROM booking_requests WHERE id = $1', [req.params.id]);
+
+  // Registra l'eliminazione per questo utente (ignora se già presente)
+  await db.query(
+    'INSERT INTO booking_deletions (user_id, booking_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+    [req.user.id, req.params.id]
+  );
+
+  // Se entrambe le parti hanno eliminato, cancella il record definitivamente
+  const booking = rows[0];
+  const otherId = booking.from_user_id === req.user.id ? booking.to_user_id : booking.from_user_id;
+  const { rows: otherDel } = await db.query(
+    'SELECT 1 FROM booking_deletions WHERE booking_id = $1 AND user_id = $2',
+    [req.params.id, otherId]
+  );
+  if (otherDel.length > 0) {
+    await db.query('DELETE FROM booking_requests WHERE id = $1', [req.params.id]);
+  }
+
   res.json({ deleted: true });
 });
 
