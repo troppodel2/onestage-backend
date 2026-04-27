@@ -16,12 +16,12 @@ router.post('/', auth, async (req, res) => {
   if (userRows[0]?.plan === 'free') {
     const { rows: countRows } = await db.query(
       `SELECT COUNT(*) FROM booking_requests
-       WHERE from_user_id = $1 AND created_at >= date_trunc('month', NOW())`,
+       WHERE from_user_id = $1 AND created_at >= CURRENT_DATE`,
       [req.user.id]
     );
-    if (parseInt(countRows[0].count) >= 3)
+    if (parseInt(countRows[0].count) >= 2)
       return res.status(403).json({
-        error: 'Hai raggiunto il limite di 3 richieste mensili con il piano Free.',
+        error: 'Hai raggiunto il limite di 2 richieste giornaliere con il piano Free.',
         code: 'PLAN_LIMIT',
       });
   }
@@ -52,6 +52,20 @@ router.post('/', auth, async (req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'Errore server' });
   }
+});
+
+// GET /bookings/daily-count — quante richieste ha inviato oggi l'utente free
+router.get('/daily-count', auth, async (req, res) => {
+  const { rows } = await db.query(
+    `SELECT COUNT(*) FROM booking_requests
+     WHERE from_user_id = $1 AND created_at >= CURRENT_DATE`,
+    [req.user.id]
+  );
+  const { rows: userRows } = await db.query('SELECT plan FROM users WHERE id = $1', [req.user.id]);
+  const plan  = userRows[0]?.plan ?? 'free';
+  const count = parseInt(rows[0].count);
+  const limit = plan === 'pro' ? null : 2;
+  res.json({ count, limit, remaining: limit === null ? null : Math.max(0, limit - count) });
 });
 
 // GET /bookings — richieste attive o archiviate (?archived=true)
