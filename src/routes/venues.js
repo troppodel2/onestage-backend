@@ -85,25 +85,34 @@ router.post('/me/profile', auth, async (req, res) => {
   if (req.user.role !== 'venue')
     return res.status(403).json({ error: 'Solo i venue possono creare un profilo venue' });
 
-  const { name, type, city, address, capacity, has_pa, has_backline,
-          budget_min, budget_max, bio, preferred_genres, avatar_url } = req.body;
+  const { name, city } = req.body;
   if (!name || !city)
     return res.status(400).json({ error: 'name e city sono obbligatori' });
+
+  const {
+    types, type, bio, address, capacity, budget_estimate,
+    phone, website_url, instagram_url, facebook_url,
+    tech_equipment, preferred_genres, features, requested_band_types, avatar_url,
+  } = req.body;
 
   try {
     const { rows } = await db.query(
       `INSERT INTO venue_profiles
-         (user_id, name, type, city, address, capacity, has_pa, has_backline,
-          budget_min, budget_max, bio, preferred_genres, avatar_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         (user_id, name, types, type, city, address, capacity, budget_estimate,
+          phone, website_url, instagram_url, facebook_url,
+          tech_equipment, preferred_genres, features, requested_band_types, bio, avatar_url)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
        RETURNING *`,
-      [req.user.id, name, type, city, address, capacity,
-       has_pa ?? false, has_backline ?? false,
-       budget_min, budget_max, bio, preferred_genres ?? [], avatar_url]
+      [req.user.id, name, types ?? [], type ?? null, city, address ?? null,
+       capacity ?? null, budget_estimate ?? null,
+       phone ?? null, website_url ?? null, instagram_url ?? null, facebook_url ?? null,
+       tech_equipment ?? [], preferred_genres ?? [], features ?? [], requested_band_types ?? [],
+       bio ?? null, avatar_url ?? null]
     );
     res.status(201).json({ profile: rows[0] });
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'Profilo già esistente' });
+    console.error('POST venue error:', e.message);
     res.status(500).json({ error: 'Errore server' });
   }
 });
@@ -113,8 +122,12 @@ router.patch('/me/profile', auth, async (req, res) => {
   if (req.user.role !== 'venue')
     return res.status(403).json({ error: 'Accesso negato' });
 
-  const fields = ['name','type','city','address','capacity','has_pa','has_backline',
-                  'budget_min','budget_max','bio','preferred_genres','avatar_url'];
+  const fields = [
+    'name', 'types', 'type', 'city', 'address', 'capacity', 'budget_estimate',
+    'phone', 'website_url', 'instagram_url', 'facebook_url',
+    'tech_equipment', 'preferred_genres', 'features', 'requested_band_types',
+    'bio', 'avatar_url',
+  ];
   const updates = [];
   const params  = [];
 
