@@ -71,10 +71,19 @@ router.get('/by-user/:userId', optionalAuth, async (req, res) => {
   res.json({ venue: rows[0] });
 });
 
-// GET /venues/me/profile
+// GET /venues/me/profiles — tutti i profili dell'utente
+router.get('/me/profiles', auth, async (req, res) => {
+  const { rows } = await db.query(
+    'SELECT * FROM venue_profiles WHERE user_id = $1 ORDER BY created_at ASC',
+    [req.user.id]
+  );
+  res.json({ profiles: rows });
+});
+
+// GET /venues/me/profile — primo profilo (retrocompatibilità)
 router.get('/me/profile', auth, async (req, res) => {
   const { rows } = await db.query(
-    'SELECT * FROM venue_profiles WHERE user_id = $1',
+    'SELECT * FROM venue_profiles WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1',
     [req.user.id]
   );
   res.json({ profile: rows[0] ?? null });
@@ -88,6 +97,14 @@ router.post('/me/profile', auth, async (req, res) => {
   const { name, city } = req.body;
   if (!name || !city)
     return res.status(400).json({ error: 'name e city sono obbligatori' });
+
+  // Limite free: max 1 venue
+  const { rows: userRows } = await db.query('SELECT plan FROM users WHERE id = $1', [req.user.id]);
+  if (userRows[0]?.plan === 'free') {
+    const { rows: countRows } = await db.query('SELECT COUNT(*) FROM venue_profiles WHERE user_id = $1', [req.user.id]);
+    if (parseInt(countRows[0].count) >= 1)
+      return res.status(403).json({ error: 'Piano Free: puoi gestire solo 1 locale. Passa a Pro per venue illimitate.', code: 'PLAN_LIMIT' });
+  }
 
   const {
     types, type, bio, address, capacity, budget_estimate,
@@ -111,14 +128,13 @@ router.post('/me/profile', auth, async (req, res) => {
     );
     res.status(201).json({ profile: rows[0] });
   } catch (e) {
-    if (e.code === '23505') return res.status(409).json({ error: 'Profilo già esistente' });
     console.error('POST venue error:', e.message);
     res.status(500).json({ error: 'Errore server' });
   }
 });
 
-// PATCH /venues/me/profile — aggiorna profilo venue
-router.patch('/me/profile', auth, async (req, res) => {
+// PATCH /venues/me/profile/:id — aggiorna profilo venue per id
+router.patch('/me/profile/:id', auth, async (req, res) => {
   if (req.user.role !== 'venue')
     return res.status(403).json({ error: 'Accesso negato' });
 
@@ -139,13 +155,24 @@ router.patch('/me/profile', auth, async (req, res) => {
   }
   if (!updates.length) return res.status(400).json({ error: 'Nessun campo da aggiornare' });
 
-  params.push(req.user.id);
+  params.push(req.params.id, req.user.id);
   const { rows } = await db.query(
-    `UPDATE venue_profiles SET ${updates.join(', ')} WHERE user_id = $${params.length} RETURNING *`,
+    `UPDATE venue_profiles SET ${updates.join(', ')}
+     WHERE id = $${params.length - 1} AND user_id = $${params.length} RETURNING *`,
     params
   );
   if (!rows[0]) return res.status(404).json({ error: 'Profilo non trovato' });
   res.json({ profile: rows[0] });
+});
+
+// DELETE /venues/me/profile/:id
+router.delete('/me/profile/:id', auth, async (req, res) => {
+  const { rows } = await db.query(
+    'DELETE FROM venue_profiles WHERE id = $1 AND user_id = $2 RETURNING id',
+    [req.params.id, req.user.id]
+  );
+  if (!rows[0]) return res.status(404).json({ error: 'Profilo non trovato' });
+  res.json({ deleted: true });
 });
 
 module.exports = router;

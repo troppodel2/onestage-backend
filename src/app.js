@@ -78,6 +78,7 @@ const migrations = [
      deleted_at  TIMESTAMP DEFAULT NOW(),
      PRIMARY KEY (user_id, booking_id)
    )`,
+  `ALTER TABLE venue_profiles DROP CONSTRAINT IF EXISTS venue_profiles_user_id_key`,
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS phone TEXT`,
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS website_url TEXT`,
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS instagram_url TEXT`,
