@@ -29,8 +29,8 @@ router.get('/', optionalAuth, async (req, res) => {
   params.push(parseInt(limit), parseInt(offset));
 
   const { rows } = await db.query(
-    `SELECT vp.id, vp.user_id, vp.name, vp.type, vp.city, vp.capacity,
-            vp.has_pa, vp.budget_min, vp.budget_max, vp.preferred_genres,
+    `SELECT vp.id, vp.user_id, vp.name, vp.type, vp.types, vp.city, vp.capacity,
+            vp.budget_estimate, vp.preferred_genres, vp.features, vp.tech_equipment,
             vp.avatar_url, vp.is_verified, u.plan
      FROM venue_profiles vp
      JOIN users u ON u.id = vp.user_id
