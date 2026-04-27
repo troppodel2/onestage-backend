@@ -107,24 +107,26 @@ router.post('/me/profile', auth, async (req, res) => {
   }
 
   const {
-    types, type, bio, address, capacity, budget_estimate,
+    types, type, custom_type_name, bio, address, capacity, budget_estimate,
     phone, website_url, instagram_url, facebook_url,
-    tech_equipment, preferred_genres, features, requested_band_types, avatar_url,
+    tech_equipment, preferred_genres, features, requested_band_types,
+    avatar_url, start_date, end_date,
   } = req.body;
 
   try {
     const { rows } = await db.query(
       `INSERT INTO venue_profiles
-         (user_id, name, types, type, city, address, capacity, budget_estimate,
+         (user_id, name, types, type, custom_type_name, city, address, capacity, budget_estimate,
           phone, website_url, instagram_url, facebook_url,
-          tech_equipment, preferred_genres, features, requested_band_types, bio, avatar_url)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
+          tech_equipment, preferred_genres, features, requested_band_types,
+          bio, avatar_url, start_date, end_date)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
        RETURNING *`,
-      [req.user.id, name, types ?? [], type ?? null, city, address ?? null,
-       capacity ?? null, budget_estimate ?? null,
+      [req.user.id, name, types ?? [], type ?? null, custom_type_name ?? null,
+       city, address ?? null, capacity ?? null, budget_estimate ?? null,
        phone ?? null, website_url ?? null, instagram_url ?? null, facebook_url ?? null,
        tech_equipment ?? [], preferred_genres ?? [], features ?? [], requested_band_types ?? [],
-       bio ?? null, avatar_url ?? null]
+       bio ?? null, avatar_url ?? null, start_date ?? null, end_date ?? null]
     );
     res.status(201).json({ profile: rows[0] });
   } catch (e) {
@@ -139,10 +141,10 @@ router.patch('/me/profile/:id', auth, async (req, res) => {
     return res.status(403).json({ error: 'Accesso negato' });
 
   const fields = [
-    'name', 'types', 'type', 'city', 'address', 'capacity', 'budget_estimate',
+    'name', 'types', 'type', 'custom_type_name', 'city', 'address', 'capacity', 'budget_estimate',
     'phone', 'website_url', 'instagram_url', 'facebook_url',
     'tech_equipment', 'preferred_genres', 'features', 'requested_band_types',
-    'bio', 'avatar_url',
+    'bio', 'avatar_url', 'start_date', 'end_date',
   ];
   const updates = [];
   const params  = [];

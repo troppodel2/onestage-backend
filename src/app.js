@@ -88,6 +88,9 @@ const migrations = [
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS budget_estimate INT`,
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS tech_equipment TEXT[] DEFAULT '{}'`,
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS requested_band_types TEXT[] DEFAULT '{}'`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS start_date DATE`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS end_date DATE`,
+  `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS custom_type_name TEXT`,
 ];
 
 // Scadenza automatica: ogni ora marca come 'expired' le richieste pending/negotiating
