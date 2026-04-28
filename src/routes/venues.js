@@ -28,13 +28,17 @@ router.get('/', optionalAuth, async (req, res) => {
   const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   params.push(parseInt(limit), parseInt(offset));
 
+  // Escludi venue con end_date già passata (archiviate)
+  const expiredClause = 'AND (vp.end_date IS NULL OR vp.end_date >= CURRENT_DATE)';
+
   const { rows } = await db.query(
-    `SELECT vp.id, vp.user_id, vp.name, vp.type, vp.types, vp.city, vp.capacity,
-            vp.budget_estimate, vp.preferred_genres, vp.features, vp.tech_equipment,
-            vp.avatar_url, vp.is_verified, u.plan
+    `SELECT vp.id, vp.user_id, vp.name, vp.type, vp.types, vp.custom_type_name,
+            vp.city, vp.capacity, vp.budget_estimate, vp.preferred_genres,
+            vp.features, vp.tech_equipment, vp.avatar_url, vp.is_verified,
+            vp.start_date, vp.end_date, u.plan
      FROM venue_profiles vp
      JOIN users u ON u.id = vp.user_id
-     ${where}
+     ${where} ${expiredClause}
      ORDER BY u.plan DESC, vp.name ASC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
