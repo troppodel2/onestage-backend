@@ -187,7 +187,7 @@ router.get('/:id', auth, async (req, res) => {
 
 // PATCH /bookings/:id/status — cambia stato (confirmed, rejected, cancelled)
 router.patch('/:id/status', auth, async (req, res) => {
-  const { status, rejection_reason } = req.body;
+  const { status, rejection_reason, confirmed_date, confirmed_cachet } = req.body;
   const allowed = ['confirmed', 'rejected', 'cancelled', 'negotiating'];
   if (!allowed.includes(status))
     return res.status(400).json({ error: `status deve essere uno di: ${allowed.join(', ')}` });
@@ -195,10 +195,13 @@ router.patch('/:id/status', auth, async (req, res) => {
   const { rows } = await db.query(
     `UPDATE booking_requests
      SET status = $1,
-         rejection_reason = CASE WHEN $1 IN ('rejected','cancelled') THEN $4 ELSE rejection_reason END
+         rejection_reason = CASE WHEN $1 IN ('rejected','cancelled') THEN $4 ELSE rejection_reason END,
+         event_date       = CASE WHEN $1 = 'confirmed' AND $5::date IS NOT NULL THEN $5::date ELSE event_date END,
+         proposed_cachet  = CASE WHEN $1 = 'confirmed' AND $6::int IS NOT NULL  THEN $6::int  ELSE proposed_cachet END
      WHERE id = $2 AND (from_user_id = $3 OR to_user_id = $3)
      RETURNING *`,
-    [status, req.params.id, req.user.id, rejection_reason ?? null]
+    [status, req.params.id, req.user.id, rejection_reason ?? null,
+     confirmed_date ?? null, confirmed_cachet ?? null]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
 
@@ -214,7 +217,9 @@ router.patch('/:id/status', auth, async (req, res) => {
     cancelled:   '🚫 Richiesta cancellata',
   };
   if (statusMessages[status]) {
-    const dateStr = new Date(booking.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+    const dateStr = booking.event_date
+      ? new Date(booking.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
+      : 'data da definire';
     sendPush(otherRows[0]?.push_token, {
       title: statusMessages[status],
       body: `${actorRows[0]?.username} — ${dateStr}`,
