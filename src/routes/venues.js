@@ -5,7 +5,10 @@ const optionalAuth = require('../middleware/optionalAuth');
 
 // GET /venues — lista pubblica con filtri
 router.get('/', optionalAuth, async (req, res) => {
-  const { q, city, genre, capacity_min, limit = 20, offset = 0 } = req.query;
+  const {
+    q, city, types, capacity_min, budget_max,
+    genres, tech, limit = 20, offset = 0,
+  } = req.query;
   const conditions = [];
   const params = [];
 
@@ -16,20 +19,40 @@ router.get('/', optionalAuth, async (req, res) => {
     params.push(`%${city}%`);
     conditions.push(`vp.city ILIKE $${params.length}`);
   }
-  if (genre) {
-    params.push(genre);
-    conditions.push(`$${params.length} = ANY(vp.preferred_genres)`);
+  if (types) {
+    const typeList = types.split(',').filter(Boolean);
+    if (typeList.length > 0) {
+      params.push(typeList);
+      conditions.push(`vp.types && $${params.length}::text[]`);
+    }
+  }
+  if (genres) {
+    const genreList = genres.split(',').filter(Boolean);
+    if (genreList.length > 0) {
+      params.push(genreList);
+      conditions.push(`vp.preferred_genres && $${params.length}::text[]`);
+    }
   }
   if (capacity_min) {
     params.push(parseInt(capacity_min));
     conditions.push(`vp.capacity >= $${params.length}`);
   }
+  if (budget_max) {
+    params.push(parseInt(budget_max));
+    conditions.push(`(vp.budget_estimate IS NULL OR vp.budget_estimate <= $${params.length})`);
+  }
+  if (tech) {
+    const techList = tech.split(',').filter(Boolean);
+    if (techList.length > 0) {
+      params.push(techList);
+      conditions.push(`vp.tech_equipment && $${params.length}::text[]`);
+    }
+  }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  // Escludi venue scadute
+  conditions.push('(vp.end_date IS NULL OR vp.end_date >= CURRENT_DATE)');
+  const where = `WHERE ${conditions.join(' AND ')}`;
   params.push(parseInt(limit), parseInt(offset));
-
-  // Escludi venue con end_date già passata (archiviate)
-  const expiredClause = 'AND (vp.end_date IS NULL OR vp.end_date >= CURRENT_DATE)';
 
   const { rows } = await db.query(
     `SELECT vp.id, vp.user_id, vp.name, vp.type, vp.types, vp.custom_type_name,
@@ -38,7 +61,7 @@ router.get('/', optionalAuth, async (req, res) => {
             vp.start_date, vp.end_date, u.plan
      FROM venue_profiles vp
      JOIN users u ON u.id = vp.user_id
-     ${where} ${expiredClause}
+     ${where}
      ORDER BY u.plan DESC, vp.name ASC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
