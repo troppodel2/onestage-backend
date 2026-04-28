@@ -210,20 +210,25 @@ router.patch('/:id/status', auth, async (req, res) => {
   const otherId = booking.from_user_id === req.user.id ? booking.to_user_id : booking.from_user_id;
   const { rows: otherRows } = await db.query('SELECT push_token, username FROM users WHERE id = $1', [otherId]);
   const { rows: actorRows } = await db.query('SELECT username FROM users WHERE id = $1', [req.user.id]);
-  const statusMessages = {
-    confirmed:   '✅ Richiesta confermata!',
-    rejected:    '❌ Richiesta rifiutata',
-    negotiating: '💬 Trattativa aperta',
-    cancelled:   '🚫 Richiesta cancellata',
-  };
-  if (statusMessages[status]) {
+  if (status !== 'negotiating') { // negotiating non manda push
     const dateStr = booking.event_date
       ? new Date(booking.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
-      : 'data da definire';
+      : null;
+    const pushTitles = {
+      confirmed:   '✅ Collaborazione confermata!',
+      rejected:    '❌ Richiesta rifiutata',
+      negotiating: '',
+      cancelled:   '🚫 Richiesta cancellata',
+    };
+    const pushBody = status === 'confirmed' && dateStr
+      ? `${actorRows[0]?.username} ha confermato la data: ${dateStr}`
+      : status === 'confirmed'
+        ? `${actorRows[0]?.username} ha confermato la collaborazione`
+        : `${actorRows[0]?.username}${dateStr ? ` — ${dateStr}` : ''}`;
     sendPush(otherRows[0]?.push_token, {
-      title: statusMessages[status],
-      body: `${actorRows[0]?.username} — ${dateStr}`,
-      data: { bookingId: booking.id, screen: 'BookingDetail' },
+      title: pushTitles[status],
+      body:  pushBody,
+      data:  { bookingId: booking.id, screen: 'BookingDetail' },
     });
   }
 

@@ -127,6 +127,32 @@ async function expireBookings() {
   }
 }
 
+// Auto-archivio: richieste confermate la cui data concerto è già passata
+// → entrambi gli utenti vengono aggiunti a booking_archives
+async function archiveCompletedBookings() {
+  try {
+    const { rows } = await db.query(
+      `SELECT id, from_user_id, to_user_id, event_date FROM booking_requests
+       WHERE status = 'confirmed' AND event_date < CURRENT_DATE`
+    );
+    for (const b of rows) {
+      await Promise.all([
+        db.query(
+          'INSERT INTO booking_archives (user_id, booking_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [b.from_user_id, b.id]
+        ),
+        db.query(
+          'INSERT INTO booking_archives (user_id, booking_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+          [b.to_user_id, b.id]
+        ),
+      ]);
+    }
+    if (rows.length > 0) console.log(`[archiveCompleted] archiviati ${rows.length} booking`);
+  } catch (e) {
+    console.error('[archiveCompleted] errore:', e.message);
+  }
+}
+
 (async () => {
   for (const sql of migrations) {
     await db.query(sql).catch(e => console.error('Migration error:', e.message));
@@ -134,7 +160,11 @@ async function expireBookings() {
 
   // Esegui subito all'avvio, poi ogni ora
   await expireBookings();
-  setInterval(expireBookings, 60 * 60 * 1000);
+  await archiveCompletedBookings();
+  setInterval(async () => {
+    await expireBookings();
+    await archiveCompletedBookings();
+  }, 60 * 60 * 1000);
 
   app.listen(PORT, () => console.log(`OneStage backend in ascolto su porta ${PORT}`));
 })();
