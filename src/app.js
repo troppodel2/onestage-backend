@@ -66,6 +66,10 @@ const migrations = [
    )`,
   `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS rejection_reason TEXT`,
   `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS expired_at TIMESTAMP`,
+  `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS band_id INT REFERENCES artist_profiles(id) ON DELETE SET NULL`,
+  `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS set_duration INT`,
+  `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS preferred_period TEXT`,
+  `ALTER TABLE booking_requests ALTER COLUMN event_date DROP NOT NULL`,
   `CREATE TABLE IF NOT EXISTS booking_archives (
      user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
      booking_id INT NOT NULL REFERENCES booking_requests(id) ON DELETE CASCADE,

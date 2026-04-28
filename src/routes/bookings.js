@@ -3,16 +3,16 @@ const db         = require('../db');
 const auth       = require('../middleware/auth');
 const { sendPush } = require('../utils/push');
 
-// POST /bookings — invia richiesta data
+// POST /bookings — invia richiesta (venue→band) o proposta (band→venue)
 router.post('/', auth, async (req, res) => {
-  const { to_user_id, event_date, proposed_cachet, notes } = req.body;
-  if (!to_user_id || !event_date)
-    return res.status(400).json({ error: 'to_user_id e event_date sono obbligatori' });
+  const { to_user_id, event_date, proposed_cachet, notes,
+          band_id, set_duration, preferred_period } = req.body;
+  if (!to_user_id)
+    return res.status(400).json({ error: 'to_user_id è obbligatorio' });
   if (to_user_id === req.user.id)
     return res.status(400).json({ error: 'Non puoi inviare una richiesta a te stesso' });
 
-  // Controlla limite piano free (3 richieste/mese)
-  const { rows: userRows } = await db.query('SELECT plan FROM users WHERE id = $1', [req.user.id]);
+  const { rows: userRows } = await db.query('SELECT plan, role FROM users WHERE id = $1', [req.user.id]);
   if (userRows[0]?.plan === 'free') {
     const { rows: countRows } = await db.query(
       `SELECT COUNT(*) FROM booking_requests
@@ -28,28 +28,40 @@ router.post('/', auth, async (req, res) => {
 
   try {
     const { rows } = await db.query(
-      `INSERT INTO booking_requests (from_user_id, to_user_id, event_date, proposed_cachet, notes)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO booking_requests
+         (from_user_id, to_user_id, event_date, proposed_cachet, notes,
+          band_id, set_duration, preferred_period)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
        RETURNING *`,
-      [req.user.id, to_user_id, event_date, proposed_cachet, notes]
+      [req.user.id, to_user_id, event_date ?? null, proposed_cachet ?? null,
+       notes ?? null, band_id ?? null, set_duration ?? null, preferred_period ?? null]
     );
 
-    // Push al destinatario
     const { rows: recipientRows } = await db.query(
       'SELECT push_token, username FROM users WHERE id = $1', [to_user_id]
     );
     const { rows: senderRows } = await db.query(
       'SELECT username FROM users WHERE id = $1', [req.user.id]
     );
-    const dateStr = new Date(event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' });
+    const isProposal = userRows[0]?.role === 'artist';
+    const pushBody = isProposal
+      ? `${senderRows[0]?.username} ti ha inviato una proposta per suonare nel tuo locale`
+      : (() => {
+          const dateStr = event_date
+            ? new Date(event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
+            : 'data da definire';
+          return `${senderRows[0]?.username} ti ha inviato una proposta per il ${dateStr}`;
+        })();
+
     sendPush(recipientRows[0]?.push_token, {
-      title: '🎵 Nuova richiesta di booking',
-      body: `${senderRows[0]?.username} ti ha inviato una proposta per il ${dateStr}`,
+      title: isProposal ? '🎸 Nuova proposta da una band' : '🎵 Nuova richiesta di booking',
+      body: pushBody,
       data: { bookingId: rows[0].id, screen: 'BookingDetail' },
     });
 
     res.status(201).json({ booking: rows[0] });
   } catch (e) {
+    console.error('POST /bookings error:', e.message);
     res.status(500).json({ error: 'Errore server' });
   }
 });
@@ -74,10 +86,14 @@ router.get('/', auth, async (req, res) => {
   const { rows } = await db.query(
     `SELECT br.*,
             fu.username AS from_username, fu.role AS from_role,
-            tu.username AS to_username,   tu.role AS to_role
+            tu.username AS to_username,   tu.role AS to_role,
+            ap.name AS band_name, ap.city AS band_city,
+            ap.genres AS band_genres, ap.band_type AS band_type_key,
+            ap.avatar_url AS band_avatar_url
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
+     LEFT JOIN artist_profiles ap ON ap.id = br.band_id
      WHERE (br.from_user_id = $1 OR br.to_user_id = $1)
        AND NOT EXISTS (SELECT 1 FROM booking_deletions bd WHERE bd.booking_id = br.id AND bd.user_id = $1)
        AND ${archived
@@ -146,10 +162,15 @@ router.get('/:id', auth, async (req, res) => {
   const { rows } = await db.query(
     `SELECT br.*,
             fu.username AS from_username, fu.role AS from_role,
-            tu.username AS to_username,   tu.role AS to_role
+            tu.username AS to_username,   tu.role AS to_role,
+            ap.name AS band_name, ap.city AS band_city,
+            ap.genres AS band_genres, ap.band_type AS band_type_key,
+            ap.avatar_url AS band_avatar_url, ap.id AS band_profile_id,
+            ap.cachet_min, ap.set_duration_min, ap.set_duration_max
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
+     LEFT JOIN artist_profiles ap ON ap.id = br.band_id
      WHERE br.id = $1 AND (br.from_user_id = $2 OR br.to_user_id = $2)`,
     [req.params.id, req.user.id]
   );
