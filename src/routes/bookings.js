@@ -192,16 +192,24 @@ router.patch('/:id/status', auth, async (req, res) => {
   if (!allowed.includes(status))
     return res.status(400).json({ error: `status deve essere uno di: ${allowed.join(', ')}` });
 
+  // Leggi lo status corrente prima di aggiornare
+  const { rows: current } = await db.query(
+    'SELECT status FROM booking_requests WHERE id = $1', [req.params.id]
+  );
+  const previousStatus = current[0]?.status;
+  const isReopening = previousStatus === 'confirmed' && status === 'negotiating';
+
   const { rows } = await db.query(
     `UPDATE booking_requests
      SET status = $1,
          rejection_reason = CASE WHEN $1 IN ('rejected','cancelled') THEN $4 ELSE rejection_reason END,
          event_date       = CASE WHEN $1 = 'confirmed' AND $5::date IS NOT NULL THEN $5::date ELSE event_date END,
-         proposed_cachet  = CASE WHEN $1 = 'confirmed' AND $6::int IS NOT NULL  THEN $6::int  ELSE proposed_cachet END
+         proposed_cachet  = CASE WHEN $1 = 'confirmed' AND $6::int IS NOT NULL  THEN $6::int  ELSE proposed_cachet END,
+         reopened_at      = CASE WHEN $7 THEN NOW() ELSE reopened_at END
      WHERE id = $2 AND (from_user_id = $3 OR to_user_id = $3)
      RETURNING *`,
     [status, req.params.id, req.user.id, rejection_reason ?? null,
-     confirmed_date ?? null, confirmed_cachet ?? null]
+     confirmed_date ?? null, confirmed_cachet ?? null, isReopening]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
 
@@ -210,7 +218,13 @@ router.patch('/:id/status', auth, async (req, res) => {
   const otherId = booking.from_user_id === req.user.id ? booking.to_user_id : booking.from_user_id;
   const { rows: otherRows } = await db.query('SELECT push_token, username FROM users WHERE id = $1', [otherId]);
   const { rows: actorRows } = await db.query('SELECT username FROM users WHERE id = $1', [req.user.id]);
-  if (status !== 'negotiating') { // negotiating non manda push
+  if (isReopening) {
+    sendPush(otherRows[0]?.push_token, {
+      title: '🔄 Trattativa riaperta',
+      body:  `${actorRows[0]?.username} ha riaperto la trattativa per rivedere i dettagli`,
+      data:  { bookingId: booking.id, screen: 'BookingDetail' },
+    });
+  } else if (status !== 'negotiating') { // negotiating normale non manda push
     const dateStr = booking.event_date
       ? new Date(booking.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
       : null;
