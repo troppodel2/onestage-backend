@@ -89,18 +89,25 @@ router.get('/', auth, async (req, res) => {
             tu.username AS to_username,   tu.role AS to_role,
             ap.name AS band_name, ap.city AS band_city,
             ap.genres AS band_genres, ap.band_type AS band_type_key,
-            ap.avatar_url AS band_avatar_url
+            ap.avatar_url AS band_avatar_url,
+            last_msg.created_at AS last_message_at,
+            last_msg.sender_id  AS last_message_sender_id
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
      LEFT JOIN artist_profiles ap ON ap.id = br.band_id
+     LEFT JOIN LATERAL (
+       SELECT sender_id, created_at FROM messages
+       WHERE booking_id = br.id
+       ORDER BY created_at DESC LIMIT 1
+     ) last_msg ON true
      WHERE (br.from_user_id = $1 OR br.to_user_id = $1)
        AND NOT EXISTS (SELECT 1 FROM booking_deletions bd WHERE bd.booking_id = br.id AND bd.user_id = $1)
        AND ${archived
          ? 'EXISTS (SELECT 1 FROM booking_archives ba WHERE ba.booking_id = br.id AND ba.user_id = $1)'
          : 'NOT EXISTS (SELECT 1 FROM booking_archives ba WHERE ba.booking_id = br.id AND ba.user_id = $1)'
        }
-     ORDER BY br.created_at DESC`,
+     ORDER BY COALESCE(last_msg.created_at, br.created_at) DESC`,
     [req.user.id]
   );
   res.json({ bookings: rows });
