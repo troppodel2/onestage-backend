@@ -81,10 +81,28 @@ router.get('/:id', optionalAuth, async (req, res) => {
   if (!rows[0]) return res.status(404).json({ error: 'Venue non trovata' });
 
   const venue = { ...rows[0] };
-  const isPro = req.user?.plan === 'pro';
-  if (!isPro) {
+  const isOwner = req.user?.id === venue.user_id;
+  if (!req.user?.plan || req.user.plan !== 'pro') {
     delete venue.contact_email;
   }
+
+  // Booking attivo tra l'utente loggato e questa venue
+  venue.active_booking_status = null;
+  if (req.user?.id && !isOwner) {
+    const { rows: ab } = await db.query(
+      `SELECT status, from_user_id FROM booking_requests
+       WHERE status IN ('pending','negotiating')
+         AND ((from_user_id = $1 AND to_user_id = $2)
+           OR (from_user_id = $2 AND to_user_id = $1))
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.user.id, venue.user_id]
+    );
+    if (ab[0]) {
+      venue.active_booking_status = ab[0].status;
+      venue.active_booking_mine   = ab[0].from_user_id === req.user.id;
+    }
+  }
+
   res.json({ venue });
 });
 

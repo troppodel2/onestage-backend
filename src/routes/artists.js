@@ -193,6 +193,23 @@ router.get('/:id', optionalAuth, async (req, res) => {
   const canSeeCachet = req.user?.role === 'venue' || req.user?.id === artist.user_id;
   if (!canSeeCachet) artist.cachet_min = null;
 
+  // Booking attivo tra l'utente loggato e questa band
+  artist.active_booking_status = null;
+  if (req.user?.id && !isOwner) {
+    const { rows: ab } = await db.query(
+      `SELECT status, from_user_id FROM booking_requests
+       WHERE status IN ('pending','negotiating')
+         AND ((from_user_id = $1 AND to_user_id = $2)
+           OR (from_user_id = $2 AND to_user_id = $1))
+       ORDER BY created_at DESC LIMIT 1`,
+      [req.user.id, artist.user_id]
+    );
+    if (ab[0]) {
+      artist.active_booking_status = ab[0].status;
+      artist.active_booking_mine   = ab[0].from_user_id === req.user.id;
+    }
+  }
+
   res.json({ artist });
 });
 
