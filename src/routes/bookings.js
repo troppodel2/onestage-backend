@@ -108,6 +108,8 @@ router.get('/', auth, async (req, res) => {
     `SELECT br.*,
             fu.username AS from_username, fu.role AS from_role,
             tu.username AS to_username,   tu.role AS to_role,
+            fvp.name AS from_venue_name,
+            tvp.name AS to_venue_name,
             ap.name AS band_name, ap.city AS band_city,
             ap.genres AS band_genres, ap.band_type AS band_type_key,
             ap.avatar_url AS band_avatar_url,
@@ -116,6 +118,8 @@ router.get('/', auth, async (req, res) => {
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
+     LEFT JOIN venue_profiles fvp ON fvp.user_id = br.from_user_id
+     LEFT JOIN venue_profiles tvp ON tvp.user_id = br.to_user_id
      LEFT JOIN artist_profiles ap ON ap.id = br.band_id
      LEFT JOIN LATERAL (
        SELECT sender_id, created_at FROM messages
@@ -210,6 +214,8 @@ router.get('/:id', auth, async (req, res) => {
     `SELECT br.*,
             fu.username AS from_username, fu.role AS from_role,
             tu.username AS to_username,   tu.role AS to_role,
+            fvp.name AS from_venue_name,
+            tvp.name AS to_venue_name,
             ap.name AS band_name, ap.city AS band_city,
             ap.genres AS band_genres, ap.band_type AS band_type_key,
             ap.avatar_url AS band_avatar_url, ap.id AS band_profile_id,
@@ -217,6 +223,8 @@ router.get('/:id', auth, async (req, res) => {
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
+     LEFT JOIN venue_profiles fvp ON fvp.user_id = br.from_user_id
+     LEFT JOIN venue_profiles tvp ON tvp.user_id = br.to_user_id
      LEFT JOIN artist_profiles ap ON ap.id = br.band_id
      WHERE br.id = $1 AND (br.from_user_id = $2 OR br.to_user_id = $2)`,
     [req.params.id, req.user.id]
