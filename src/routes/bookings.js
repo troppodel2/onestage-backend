@@ -257,27 +257,31 @@ router.patch('/:id/status', auth, async (req, res) => {
       body:  `${actorRows[0]?.username} ha riaperto la trattativa per rivedere i dettagli`,
       data:  { bookingId: booking.id, screen: 'BookingDetail' },
     });
-  } else if (status !== 'negotiating') { // negotiating normale non manda push
+  } else if (status === 'confirmed') {
     const dateStr = booking.event_date
       ? new Date(booking.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
       : null;
-    const pushTitles = {
-      confirmed:   '✅ Collaborazione confermata!',
-      rejected:    '❌ Richiesta rifiutata',
-      negotiating: '',
-      cancelled:   '🚫 Richiesta cancellata',
-    };
-    const pushBody = status === 'confirmed' && dateStr
-      ? `${actorRows[0]?.username} ha confermato la data: ${dateStr}`
-      : status === 'confirmed'
-        ? `${actorRows[0]?.username} ha confermato la collaborazione`
-        : `${actorRows[0]?.username}${dateStr ? ` — ${dateStr}` : ''}`;
     sendPush(otherRows[0]?.push_token, {
-      title: pushTitles[status],
-      body:  pushBody,
+      title: '✅ Collaborazione confermata!',
+      body:  dateStr
+        ? `${actorRows[0]?.username} ha confermato la data: ${dateStr}`
+        : `${actorRows[0]?.username} ha confermato la collaborazione`,
+      data:  { bookingId: booking.id, screen: 'BookingDetail' },
+    });
+  } else if (status === 'rejected') {
+    sendPush(otherRows[0]?.push_token, {
+      title: '❌ Richiesta rifiutata',
+      body:  `${actorRows[0]?.username} ha rifiutato la richiesta`,
+      data:  { bookingId: booking.id, screen: 'BookingDetail' },
+    });
+  } else if (status === 'cancelled') {
+    sendPush(otherRows[0]?.push_token, {
+      title: '🚫 Richiesta cancellata',
+      body:  `${actorRows[0]?.username} ha cancellato la richiesta`,
       data:  { bookingId: booking.id, screen: 'BookingDetail' },
     });
   }
+  // 'negotiating' senza riapertura → nessuna push
 
   res.json({ booking: rows[0] });
 });
