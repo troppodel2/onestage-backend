@@ -284,7 +284,7 @@ router.get('/:id', auth, async (req, res) => {
 
 // PATCH /bookings/:id/status — cambia stato (confirmed, rejected, cancelled)
 router.patch('/:id/status', auth, async (req, res) => {
-  const { status, rejection_reason, confirmed_date, confirmed_cachet } = req.body;
+  const { status, rejection_reason, confirmed_date, confirmed_cachet, confirmed_time } = req.body;
   const allowed = ['confirmed', 'rejected', 'cancelled', 'negotiating'];
   if (!allowed.includes(status))
     return res.status(400).json({ error: `status deve essere uno di: ${allowed.join(', ')}` });
@@ -345,9 +345,9 @@ router.patch('/:id/status', auth, async (req, res) => {
       await db.query('DELETE FROM events WHERE booking_id_new = $1', [booking.id]);
       await db.query(
         `INSERT INTO events
-           (booking_id_new, user_id, artist_id, venue_id, event_date, is_public)
-         VALUES ($1, $2, $3, $4, $5, true)`,
-        [booking.id, req.user.id, artistId, venueId, confirmed_date]
+           (booking_id_new, user_id, artist_id, venue_id, event_date, start_time, is_public)
+         VALUES ($1, $2, $3, $4, $5, $6, true)`,
+        [booking.id, req.user.id, artistId, venueId, confirmed_date, confirmed_time ?? null]
       );
     }
   }
