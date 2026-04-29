@@ -58,7 +58,7 @@ router.get('/', optionalAuth, async (req, res) => {
     `SELECT vp.id, vp.user_id, vp.name, vp.type, vp.types, vp.custom_type_name,
             vp.city, vp.capacity, vp.budget_estimate, vp.preferred_genres,
             vp.features, vp.tech_equipment, vp.avatar_url, vp.is_verified,
-            vp.start_date, vp.end_date, u.plan
+            vp.start_date, vp.end_date, vp.created_at, u.plan
      FROM venue_profiles vp
      JOIN users u ON u.id = vp.user_id
      ${where}

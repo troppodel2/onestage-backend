@@ -57,7 +57,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const { rows } = await db.query(
       `SELECT ap.id, ap.user_id, ap.name, ap.city, ap.genres, ap.cachet_min,
               ap.avatar_url, ap.is_verified, ap.band_type, ap.tribute_artist,
-              u.plan
+              ap.created_at, u.plan
        FROM artist_profiles ap
        JOIN users u ON u.id = ap.user_id
        ${where}
