@@ -115,6 +115,7 @@ const migrations = [
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS artist_name TEXT`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS venue_name TEXT`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN DEFAULT false`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS start_time TEXT`,
 ];
 
 // Scadenza automatica: ogni ora marca come 'expired' le richieste pending/negotiating

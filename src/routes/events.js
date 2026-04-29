@@ -74,7 +74,7 @@ router.get('/mine', auth, async (req, res) => {
 // POST /events — crea evento manualmente
 router.post('/', auth, async (req, res) => {
   const { artist_id, venue_id, event_date, title, description,
-          location, artist_name, venue_name, is_public } = req.body;
+          location, artist_name, venue_name, start_time, is_public } = req.body;
   if (!event_date)
     return res.status(400).json({ error: 'event_date è obbligatorio' });
 
@@ -82,12 +82,12 @@ router.post('/', auth, async (req, res) => {
     const { rows } = await db.query(
       `INSERT INTO events
          (user_id, artist_id, venue_id, event_date, title, description,
-          location, artist_name, venue_name, is_public)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,
+          location, artist_name, venue_name, start_time, is_public)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
       [req.user.id, artist_id ?? null, venue_id ?? null, event_date,
        title ?? null, description ?? null,
        location ?? null, artist_name ?? null, venue_name ?? null,
-       is_public ?? true]
+       start_time ?? null, is_public ?? true]
     );
     res.status(201).json({ event: rows[0] });
   } catch (e) {
@@ -98,7 +98,7 @@ router.post('/', auth, async (req, res) => {
 
 // PATCH /events/:id — aggiorna evento (solo creatore)
 router.patch('/:id', auth, async (req, res) => {
-  const fields = ['title','description','event_date','location',
+  const fields = ['title','description','event_date','start_time','location',
                   'artist_name','venue_name','is_public','is_cancelled'];
   const updates = [], params = [];
   for (const f of fields) {
