@@ -105,6 +105,16 @@ const migrations = [
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS start_date DATE`,
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS end_date DATE`,
   `ALTER TABLE venue_profiles ADD COLUMN IF NOT EXISTS custom_type_name TEXT`,
+  // Fix events table
+  `ALTER TABLE events DROP CONSTRAINT IF EXISTS events_booking_id_fkey`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS booking_id_new INT REFERENCES booking_requests(id) ON DELETE SET NULL`,
+  `ALTER TABLE events ALTER COLUMN venue_id DROP NOT NULL`,
+  `ALTER TABLE events ALTER COLUMN artist_id DROP NOT NULL`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE SET NULL`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS location TEXT`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS artist_name TEXT`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS venue_name TEXT`,
+  `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN DEFAULT false`,
 ];
 
 // Scadenza automatica: ogni ora marca come 'expired' le richieste pending/negotiating

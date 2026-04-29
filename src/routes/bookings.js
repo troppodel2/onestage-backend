@@ -253,7 +253,7 @@ router.patch('/:id/status', auth, async (req, res) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
 
-  // Salva storico trattativa quando si conferma
+  // Salva storico trattativa + crea evento quando si conferma
   if (status === 'confirmed') {
     const { rows: roundRows } = await db.query(
       'SELECT COUNT(*) FROM booking_negotiations WHERE booking_id = $1',
@@ -265,6 +265,32 @@ router.patch('/:id/status', auth, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5)`,
       [req.params.id, round, confirmed_date ?? null, confirmed_cachet ?? null, req.user.id]
     );
+
+    // Crea o aggiorna l'evento associato al booking
+    if (confirmed_date) {
+      const { rows: fromUserRows } = await db.query(
+        'SELECT role FROM users WHERE id = $1', [booking.from_user_id]
+      );
+      const fromRole     = fromUserRows[0]?.role;
+      const artistUserId = fromRole === 'artist' ? booking.from_user_id : booking.to_user_id;
+      const venueUserId  = fromRole === 'venue'  ? booking.from_user_id : booking.to_user_id;
+
+      const [artistProfile, venueProfile] = await Promise.all([
+        db.query('SELECT id FROM artist_profiles WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1', [artistUserId]),
+        db.query('SELECT id FROM venue_profiles   WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1', [venueUserId]),
+      ]);
+      const artistId = booking.band_id ?? artistProfile.rows[0]?.id ?? null;
+      const venueId  = venueProfile.rows[0]?.id ?? null;
+
+      // Elimina evento precedente legato a questo booking se esiste
+      await db.query('DELETE FROM events WHERE booking_id_new = $1', [booking.id]);
+      await db.query(
+        `INSERT INTO events
+           (booking_id_new, user_id, artist_id, venue_id, event_date, is_public)
+         VALUES ($1, $2, $3, $4, $5, true)`,
+        [booking.id, req.user.id, artistId, venueId, confirmed_date]
+      );
+    }
   }
 
   // Push all'altro utente
