@@ -118,8 +118,8 @@ router.get('/', auth, async (req, res) => {
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
-     LEFT JOIN venue_profiles fvp ON fvp.user_id = br.from_user_id
-     LEFT JOIN venue_profiles tvp ON tvp.user_id = br.to_user_id
+     LEFT JOIN LATERAL (SELECT name FROM venue_profiles WHERE user_id = br.from_user_id ORDER BY created_at ASC LIMIT 1) fvp ON true
+     LEFT JOIN LATERAL (SELECT name FROM venue_profiles WHERE user_id = br.to_user_id   ORDER BY created_at ASC LIMIT 1) tvp ON true
      LEFT JOIN artist_profiles ap ON ap.id = br.band_id
      LEFT JOIN LATERAL (
        SELECT sender_id, created_at FROM messages
@@ -223,8 +223,8 @@ router.get('/:id', auth, async (req, res) => {
      FROM booking_requests br
      JOIN users fu ON fu.id = br.from_user_id
      JOIN users tu ON tu.id = br.to_user_id
-     LEFT JOIN venue_profiles fvp ON fvp.user_id = br.from_user_id
-     LEFT JOIN venue_profiles tvp ON tvp.user_id = br.to_user_id
+     LEFT JOIN LATERAL (SELECT name FROM venue_profiles WHERE user_id = br.from_user_id ORDER BY created_at ASC LIMIT 1) fvp ON true
+     LEFT JOIN LATERAL (SELECT name FROM venue_profiles WHERE user_id = br.to_user_id   ORDER BY created_at ASC LIMIT 1) tvp ON true
      LEFT JOIN artist_profiles ap ON ap.id = br.band_id
      WHERE br.id = $1 AND (br.from_user_id = $2 OR br.to_user_id = $2)`,
     [req.params.id, req.user.id]
