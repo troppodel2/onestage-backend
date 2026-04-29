@@ -13,6 +13,27 @@ router.post('/', auth, async (req, res) => {
     return res.status(400).json({ error: 'Non puoi inviare una richiesta a te stesso' });
 
   const { rows: userRows } = await db.query('SELECT plan, role FROM users WHERE id = $1', [req.user.id]);
+
+  // Blocca se c'è già una collaborazione confermata attiva tra i due utenti
+  const { rows: activeConfirmed } = await db.query(
+    `SELECT id, event_date FROM booking_requests
+     WHERE status = 'confirmed'
+       AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))
+       AND (event_date IS NULL OR event_date >= CURRENT_DATE)
+     LIMIT 1`,
+    [req.user.id, to_user_id]
+  );
+  if (activeConfirmed.length > 0) {
+    const d = activeConfirmed[0].event_date;
+    const dateStr = d
+      ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
+      : 'data da definire';
+    return res.status(409).json({
+      error: `Hai già una collaborazione confermata con questo utente (${dateStr}). Completa o riapri quella in corso prima di inviarne un'altra.`,
+      code: 'ACTIVE_CONFIRMED',
+    });
+  }
+
   if (userRows[0]?.plan === 'free') {
     const { rows: countRows } = await db.query(
       `SELECT COUNT(*) FROM booking_requests
