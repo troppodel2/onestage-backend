@@ -310,6 +310,8 @@ router.patch('/:id/status', auth, async (req, res) => {
   );
   if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
 
+  const booking = rows[0]; // definito subito dopo l'UPDATE
+
   // Salva storico trattativa + crea evento quando si conferma
   if (status === 'confirmed') {
     const { rows: roundRows } = await db.query(
@@ -351,7 +353,6 @@ router.patch('/:id/status', auth, async (req, res) => {
   }
 
   // Push all'altro utente
-  const booking = rows[0];
   const otherId = booking.from_user_id === req.user.id ? booking.to_user_id : booking.from_user_id;
   const { rows: otherRows } = await db.query('SELECT push_token, username FROM users WHERE id = $1', [otherId]);
   const { rows: actorRows } = await db.query('SELECT username FROM users WHERE id = $1', [req.user.id]);
