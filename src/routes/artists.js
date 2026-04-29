@@ -112,8 +112,10 @@ router.post('/me/profiles', auth, async (req, res) => {
   if (req.user.role !== 'artist')
     return res.status(403).json({ error: 'Solo gli artisti possono creare un profilo band' });
 
-  // Limite: gli artisti free possono avere una sola band
-  if (req.user.plan !== 'pro') {
+  // Limite: gli artisti free possono avere una sola band — legge piano dal DB (non dal JWT)
+  const { rows: userRows } = await db.query('SELECT plan FROM users WHERE id = $1', [req.user.id]);
+  const userPlan = userRows[0]?.plan ?? 'free';
+  if (userPlan !== 'pro') {
     const { rows: existing } = await db.query(
       'SELECT id FROM artist_profiles WHERE user_id = $1',
       [req.user.id]
