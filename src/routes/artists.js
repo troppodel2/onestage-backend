@@ -199,7 +199,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
   artist.active_booking_status = null;
   if (req.user?.id && !isOwner) {
     const { rows: ab } = await db.query(
-      `SELECT status, from_user_id, event_date FROM booking_requests
+      `SELECT status, from_user_id, event_date, venue_profile_id FROM booking_requests
        WHERE status IN ('pending','negotiating','confirmed')
          AND ((from_user_id = $1 AND to_user_id = $2)
            OR (from_user_id = $2 AND to_user_id = $1))

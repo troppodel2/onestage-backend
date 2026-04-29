@@ -89,14 +89,21 @@ router.get('/:id', optionalAuth, async (req, res) => {
   // Booking attivo tra l'utente loggato e questa venue
   venue.active_booking_status = null;
   if (req.user?.id && !isOwner) {
+    // Cerca prima per venue_profile_id (booking precisi), poi fallback su user_id (vecchi booking)
     const { rows: ab } = await db.query(
       `SELECT status, from_user_id, event_date FROM booking_requests
        WHERE status IN ('pending','negotiating','confirmed')
-         AND ((from_user_id = $1 AND to_user_id = $2)
-           OR (from_user_id = $2 AND to_user_id = $1))
+         AND (
+           venue_profile_id = $3
+           OR (venue_profile_id IS NULL AND (
+             (from_user_id = $1 AND to_user_id = $2)
+             OR (from_user_id = $2 AND to_user_id = $1)
+           ))
+         )
+         AND (from_user_id = $1 OR to_user_id = $1)
          AND (status != 'confirmed' OR event_date IS NULL OR event_date >= CURRENT_DATE)
        ORDER BY created_at DESC LIMIT 1`,
-      [req.user.id, venue.user_id]
+      [req.user.id, venue.user_id, venue.id]
     );
     if (ab[0]) {
       venue.active_booking_status = ab[0].status;

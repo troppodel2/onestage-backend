@@ -6,7 +6,7 @@ const { sendPush } = require('../utils/push');
 // POST /bookings — invia richiesta (venue→band) o proposta (band→venue)
 router.post('/', auth, async (req, res) => {
   const { to_user_id, event_date, proposed_cachet, notes,
-          band_id, set_duration, preferred_period } = req.body;
+          band_id, set_duration, preferred_period, venue_profile_id } = req.body;
   if (!to_user_id)
     return res.status(400).json({ error: 'to_user_id è obbligatorio' });
   if (to_user_id === req.user.id)
@@ -14,24 +14,27 @@ router.post('/', auth, async (req, res) => {
 
   const { rows: userRows } = await db.query('SELECT plan, role FROM users WHERE id = $1', [req.user.id]);
 
-  // Blocca se c'è già una collaborazione confermata attiva tra i due utenti
-  const { rows: activeConfirmed } = await db.query(
-    `SELECT id, event_date FROM booking_requests
-     WHERE status = 'confirmed'
-       AND ((from_user_id = $1 AND to_user_id = $2) OR (from_user_id = $2 AND to_user_id = $1))
-       AND (event_date IS NULL OR event_date >= CURRENT_DATE)
-     LIMIT 1`,
-    [req.user.id, to_user_id]
-  );
-  if (activeConfirmed.length > 0) {
-    const d = activeConfirmed[0].event_date;
-    const dateStr = d
-      ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
-      : 'data da definire';
-    return res.status(409).json({
-      error: `Hai già una collaborazione confermata con questo utente (${dateStr}). Completa o riapri quella in corso prima di inviarne un'altra.`,
-      code: 'ACTIVE_CONFIRMED',
-    });
+  // Blocca solo se c'è già una confirmed PER QUESTO SPECIFICO PROFILO VENUE
+  if (venue_profile_id) {
+    const { rows: activeConfirmed } = await db.query(
+      `SELECT id, event_date FROM booking_requests
+       WHERE status = 'confirmed'
+         AND venue_profile_id = $1
+         AND (from_user_id = $2 OR to_user_id = $2)
+         AND (event_date IS NULL OR event_date >= CURRENT_DATE)
+       LIMIT 1`,
+      [venue_profile_id, to_user_id]
+    );
+    if (activeConfirmed.length > 0) {
+      const d = activeConfirmed[0].event_date;
+      const dateStr = d
+        ? new Date(d).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
+        : 'data da definire';
+      return res.status(409).json({
+        error: `Hai già una collaborazione confermata per questa venue (${dateStr}).`,
+        code: 'ACTIVE_CONFIRMED',
+      });
+    }
   }
 
   if (userRows[0]?.plan === 'free') {
@@ -51,11 +54,12 @@ router.post('/', auth, async (req, res) => {
     const { rows } = await db.query(
       `INSERT INTO booking_requests
          (from_user_id, to_user_id, event_date, proposed_cachet, notes,
-          band_id, set_duration, preferred_period)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+          band_id, set_duration, preferred_period, venue_profile_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
        RETURNING *`,
       [req.user.id, to_user_id, event_date ?? null, proposed_cachet ?? null,
-       notes ?? null, band_id ?? null, set_duration ?? null, preferred_period ?? null]
+       notes ?? null, band_id ?? null, set_duration ?? null, preferred_period ?? null,
+       venue_profile_id ?? null]
     );
 
     const { rows: recipientRows } = await db.query(
