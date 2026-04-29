@@ -105,7 +105,7 @@ router.get('/daily-count', auth, async (req, res) => {
 router.get('/', auth, async (req, res) => {
   const archived = req.query.archived === 'true';
   const { rows } = await db.query(
-    `SELECT br.*,
+    `SELECT DISTINCT ON (br.id) br.*,
             fu.username AS from_username, fu.role AS from_role,
             tu.username AS to_username,   tu.role AS to_role,
             fvp.name AS from_venue_name,
@@ -132,7 +132,7 @@ router.get('/', auth, async (req, res) => {
          ? 'EXISTS (SELECT 1 FROM booking_archives ba WHERE ba.booking_id = br.id AND ba.user_id = $1)'
          : 'NOT EXISTS (SELECT 1 FROM booking_archives ba WHERE ba.booking_id = br.id AND ba.user_id = $1)'
        }
-     ORDER BY COALESCE(last_msg.created_at, br.created_at) DESC`,
+     ORDER BY br.id DESC, COALESCE(last_msg.created_at, br.created_at) DESC`,
     [req.user.id]
   );
   res.json({ bookings: rows });
