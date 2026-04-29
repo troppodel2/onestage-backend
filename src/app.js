@@ -71,6 +71,15 @@ const migrations = [
   `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS preferred_period TEXT`,
   `ALTER TABLE booking_requests ALTER COLUMN event_date DROP NOT NULL`,
   `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMP`,
+  `CREATE TABLE IF NOT EXISTS booking_negotiations (
+     id           SERIAL PRIMARY KEY,
+     booking_id   INT NOT NULL REFERENCES booking_requests(id) ON DELETE CASCADE,
+     round        INT NOT NULL DEFAULT 1,
+     event_date   DATE,
+     cachet       INT,
+     confirmed_at TIMESTAMP DEFAULT NOW(),
+     confirmed_by INT REFERENCES users(id)
+   )`,
   `CREATE TABLE IF NOT EXISTS booking_archives (
      user_id    INT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
      booking_id INT NOT NULL REFERENCES booking_requests(id) ON DELETE CASCADE,

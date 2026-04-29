@@ -164,6 +164,25 @@ router.delete('/:id', auth, async (req, res) => {
   res.json({ deleted: true });
 });
 
+// GET /bookings/:id/negotiations — storico trattative
+router.get('/:id/negotiations', auth, async (req, res) => {
+  const { rows: access } = await db.query(
+    'SELECT id FROM booking_requests WHERE id = $1 AND (from_user_id = $2 OR to_user_id = $2)',
+    [req.params.id, req.user.id]
+  );
+  if (!access[0]) return res.status(403).json({ error: 'Accesso negato' });
+
+  const { rows } = await db.query(
+    `SELECT bn.*, u.username AS confirmed_by_username
+     FROM booking_negotiations bn
+     LEFT JOIN users u ON u.id = bn.confirmed_by
+     WHERE bn.booking_id = $1
+     ORDER BY bn.round ASC`,
+    [req.params.id]
+  );
+  res.json({ negotiations: rows });
+});
+
 // GET /bookings/:id — singola richiesta
 router.get('/:id', auth, async (req, res) => {
   const { rows } = await db.query(
@@ -212,6 +231,20 @@ router.patch('/:id/status', auth, async (req, res) => {
      confirmed_date ?? null, confirmed_cachet ?? null, isReopening]
   );
   if (!rows[0]) return res.status(404).json({ error: 'Richiesta non trovata' });
+
+  // Salva storico trattativa quando si conferma
+  if (status === 'confirmed') {
+    const { rows: roundRows } = await db.query(
+      'SELECT COUNT(*) FROM booking_negotiations WHERE booking_id = $1',
+      [req.params.id]
+    );
+    const round = parseInt(roundRows[0].count) + 1;
+    await db.query(
+      `INSERT INTO booking_negotiations (booking_id, round, event_date, cachet, confirmed_by)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [req.params.id, round, confirmed_date ?? null, confirmed_cachet ?? null, req.user.id]
+    );
+  }
 
   // Push all'altro utente
   const booking = rows[0];
