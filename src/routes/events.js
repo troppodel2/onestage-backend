@@ -24,8 +24,9 @@ router.get('/', optionalAuth, async (req, res) => {
   if (artist_id) { params.push(parseInt(artist_id)); conditions.push(`e.artist_id = $${params.length}`); }
   if (venue_id)  { params.push(parseInt(venue_id));  conditions.push(`e.venue_id  = $${params.length}`); }
 
-  // Escludi eventi dell'utente loggato
-  if (req.user?.id) {
+  // Escludi eventi dell'utente loggato solo se non filtriamo per profilo specifico
+  const isProfileView = artist_id || venue_id;
+  if (req.user?.id && !isProfileView) {
     params.push(req.user.id);
     conditions.push(`e.user_id != $${params.length}`);
   }
