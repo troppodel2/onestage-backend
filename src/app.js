@@ -117,6 +117,8 @@ const migrations = [
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS is_cancelled BOOLEAN DEFAULT false`,
   `ALTER TABLE events ADD COLUMN IF NOT EXISTS start_time TEXT`,
   `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS venue_profile_id INT REFERENCES venue_profiles(id) ON DELETE SET NULL`,
+  `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS date_cancelled_at TIMESTAMP`,
+  `ALTER TABLE booking_requests ADD COLUMN IF NOT EXISTS date_cancellation_reason TEXT`,
 ];
 
 // Scadenza automatica: ogni ora marca come 'expired' le richieste pending/negotiating

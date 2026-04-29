@@ -191,6 +191,55 @@ router.delete('/:id', auth, async (req, res) => {
   res.json({ deleted: true });
 });
 
+// PATCH /bookings/:id/cancel-date — annulla la data confermata (solo su status=confirmed)
+router.patch('/:id/cancel-date', auth, async (req, res) => {
+  const { reason } = req.body;
+  if (!reason?.trim())
+    return res.status(400).json({ error: 'La motivazione è obbligatoria.' });
+
+  // Verifica che il booking sia confirmed e appartenga all'utente
+  const { rows: check } = await db.query(
+    `SELECT br.*, fu.role AS from_role FROM booking_requests br
+     JOIN users fu ON fu.id = br.from_user_id
+     WHERE br.id = $1 AND (br.from_user_id = $2 OR br.to_user_id = $2) AND br.status = 'confirmed'`,
+    [req.params.id, req.user.id]
+  );
+  if (!check[0]) return res.status(404).json({ error: 'Booking non trovato o non ancora confermato.' });
+
+  const booking = check[0];
+
+  // Torna in negotiating con annotazione annullamento
+  const { rows } = await db.query(
+    `UPDATE booking_requests
+     SET status = 'negotiating',
+         date_cancelled_at = NOW(),
+         date_cancellation_reason = $1
+     WHERE id = $2 RETURNING *`,
+    [reason.trim(), req.params.id]
+  );
+
+  // Annulla l'evento associato
+  await db.query(
+    'UPDATE events SET is_cancelled = true WHERE booking_id_new = $1',
+    [req.params.id]
+  );
+
+  // Push all'altro utente
+  const otherId = booking.from_user_id === req.user.id ? booking.to_user_id : booking.from_user_id;
+  const { rows: otherRows } = await db.query('SELECT push_token FROM users WHERE id = $1', [otherId]);
+  const { rows: actorRows } = await db.query('SELECT username FROM users WHERE id = $1', [req.user.id]);
+  const dateStr = booking.event_date
+    ? new Date(booking.event_date).toLocaleDateString('it-IT', { day: '2-digit', month: 'long', year: 'numeric' })
+    : 'la data concordata';
+  sendPush(otherRows[0]?.push_token, {
+    title: '📅 Data annullata',
+    body:  `${actorRows[0]?.username} ha annullato ${dateStr}`,
+    data:  { bookingId: booking.id, screen: 'BookingDetail' },
+  });
+
+  res.json({ booking: rows[0] });
+});
+
 // GET /bookings/:id/negotiations — storico trattative
 router.get('/:id/negotiations', auth, async (req, res) => {
   const { rows: access } = await db.query(
